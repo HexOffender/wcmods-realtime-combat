@@ -1,0 +1,13 @@
+# What a build makes: Visual Studio's files, and the built mod
+build/
+.vs/
+dlls/
+*.vcxproj.user
+
+# Written on each computer by tools/sync_ue4ss_props.py from wcmods' UE4SS build (realtime-combat/README.md)
+UE4SS.props
+wcmods.local.props
+
+# Release zips (tools/pack.py) and Python's caches
+dist/
+__pycache__/
