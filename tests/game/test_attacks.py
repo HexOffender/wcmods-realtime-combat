@@ -86,7 +86,7 @@ def test_light_attacks_follow_on(agent):
     """A light attack pressed near the end of one follows it, with no press after."""
     before = h.get(agent, "attacks") or 0
     h.action(agent, "light")
-    time.sleep(0.55)          # past 60% of its 0.73 s
+    time.sleep(0.45)          # once it's landed (0.38 s into its 0.73 s)
     h.action(agent, "light")
     h.until(agent, f'({h.MOD}.get("attacks") or 0) >= {before + 2}', 2, "the second attack to follow")
     h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attacks to end")

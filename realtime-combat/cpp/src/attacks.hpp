@@ -1,8 +1,8 @@
 // attacks.hpp: step 3, your cat's attacks. F is a light attack (the fights' Quick Claw), G a heavy one (Strong Claw),
 // F while running a lunge (Jump Attack) that carries your cat forward. Each plays the strike of its animation
 // (rules.hpp's spec()), costs the game's own stamina, turns your cat to the animal it's locked on to, and at the
-// moment it lands hits every animal in a cone in front (enemies.hpp). A light attack pressed in the last part of one
-// follows it.
+// moment it lands hits every animal in a cone in front that your cat can see (enemies.hpp). A light attack pressed
+// once one has landed follows it.
 //
 // Shared for tests: "attack" (the one playing: "light", "heavy", "lunge", or ""), "attacks" (how many made),
 // "hits" (how many animals hit), "last_hit" (the last one's address), "refused" (attacks not made for want of
@@ -68,7 +68,7 @@ namespace rtc::attacks
             wcmods::share("refused", ++s.refused);
             return false;
         }
-        if (UObject* target = lockon::locked()) wcmods::face(me, target);
+        if (UObject* target = lockon::locked()) game::turn_to(me, target);
         s.montage = game::play_from(me, sp.tag, sp.from, sp.rate);
         s.now = a;
         s.elapsed = 0;
@@ -104,7 +104,7 @@ namespace rtc::attacks
         {
             if (enemies::defeated(animal.actor)) continue;
             auto them = game::at(animal.actor);
-            if (!them || !in_reach(*at, *yaw, *them, sp.reach, sp.cone)) continue;
+            if (!them || !in_reach(*at, *yaw, *them, sp.reach, sp.cone) || !game::can_see(animal.actor)) continue;
             enemies::hit(animal.actor, damage, *at, sp.push);
             wcmods::share("hits", ++s.hits);
             wcmods::share("last_hit", static_cast<double>(game::id(animal.actor)));

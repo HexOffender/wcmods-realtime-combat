@@ -255,10 +255,10 @@ namespace rtc
         return light;
     }
     // In real seconds from the press: how long it lasts, when it lands, and from when another light attack pressed
-    // is kept to follow it (the last 40%).
+    // is kept to follow it (once it's landed).
     inline auto duration(const AttackSpec& s) -> double { return (s.to - s.from) / s.rate; }
     inline auto hit_at(const AttackSpec& s) -> double { return (s.hit - s.from) / s.rate; }
-    inline auto chain_from(const AttackSpec& s) -> double { return duration(s) * 0.6; }
+    inline auto chain_from(const AttackSpec& s) -> double { return hit_at(s); }
 
     // Stamina, as the game keeps it (100 on a cat, 20 a second back): an attack needs at least half its cost, and takes
     // it to 0 at worst; none comes back while it plays or for `stamina_pause` seconds after.

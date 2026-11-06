@@ -84,6 +84,19 @@ namespace rtc::game
         return wcmods::get(r->get(L"ReturnValue"), L"Yaw").number();
     }
 
+    // Turn an actor (only it: not its controller, so the camera's left to lock-on's easing) to face another.
+    inline auto turn_to(UObject* actor, UObject* other) -> bool
+    {
+        auto from = at(actor);
+        auto to = at(other);
+        if (!from || !to) return false;
+        const double yaw = yaw_to(*from, *to);
+        return wcmods::call_reflected(actor, STR("K2_SetActorRotation"), [&](wcmods::Params& p) {
+                   wcmods::set(p.nth(0), L"Yaw", yaw);
+                   p.set_nth(1, wcmods::Value::of(false));   // bTeleportPhysics
+               }).has_value();
+    }
+
     // How fast an actor moves, along the ground (cm/s).
     inline auto speed(UObject* actor) -> double
     {

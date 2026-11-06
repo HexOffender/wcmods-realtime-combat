@@ -180,7 +180,7 @@ static void attacks_are_quick_and_land_inside()
         CHECK(s.from < s.hit && s.hit < s.to);
         CHECK(rtc::duration(s) > 0.5 && rtc::duration(s) < 1.5);
         CHECK(rtc::hit_at(s) > 0.2 && rtc::hit_at(s) < rtc::duration(s));
-        CHECK(rtc::chain_from(s) > rtc::hit_at(s) * 0.9);
+        CHECK(rtc::chain_from(s) >= rtc::hit_at(s) && rtc::chain_from(s) < rtc::duration(s));
         CHECK(!s.tag.empty() && !s.name.empty());
     }
     // the light one is the quickest and cheapest; the heavy one the strongest and dearest

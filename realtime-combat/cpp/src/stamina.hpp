@@ -14,6 +14,7 @@ namespace rtc::stamina
     {
         double pause = 0;    // seconds more that none comes back, once nothing's playing
         float held = -1;     // the most it may be while it's held (-1: not held)
+        wcmods::Resource resource;   // your cat's, found as it's spent (it's the same while it's held)
     };
     inline auto state() -> State&
     {
@@ -27,6 +28,7 @@ namespace rtc::stamina
         auto r = wcmods::cat().stamina();
         if (!r || !can_spend(*r.value, cost)) return false;
         *r.value = static_cast<float>(rtc::spend(*r.value, cost));
+        state().resource = r;
         state().held = *r.value;
         state().pause = stamina_pause;
         return true;
@@ -38,8 +40,8 @@ namespace rtc::stamina
     {
         State& s = state();
         if (s.held < 0) return;
-        auto r = wcmods::cat().stamina();
-        if (!r)
+        const wcmods::Resource& r = s.resource;
+        if (!r || !wcmods::player())
         {
             s.held = -1;
             return;
