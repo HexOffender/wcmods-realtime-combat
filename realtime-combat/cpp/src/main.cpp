@@ -169,6 +169,44 @@ namespace
         rtc::hud::frame(dt);
     }
 
+    // A number in settings.json, and a setting changed from the menu: saved, and the mod's parts reading it again.
+    auto setting(const char* key, double fallback) -> double
+    {
+        std::lock_guard lock(wcmods::settings_lock());
+        return wcmods::settings()[key].number(fallback);
+    }
+    auto flag(const char* key, bool fallback) -> bool
+    {
+        std::lock_guard lock(wcmods::settings_lock());
+        return wcmods::settings()[key].boolean(fallback);
+    }
+    auto change(const char* key, wcmods::Json value) -> void
+    {
+        {
+            std::lock_guard lock(wcmods::settings_lock());
+            wcmods::settings().set(key, std::move(value));
+        }
+        // written once things settle (a slider dragged changes many times a second), half a second after the last
+        static int changes = 0;
+        const int mine = ++changes;
+        wcmods::after(0.5, [mine] {
+            if (mine != changes) return;   // a later change writes it
+            if (!wcmods::save_settings()) wcmods::log(L"couldn't write settings.json");
+        });
+        rtc::lockon::load();
+        rtc::attacks::load();
+        rtc::enemies::load();
+        rtc::foes::load();
+        rtc::flask::reload();
+    }
+    auto slider_row(wcmods::Ui& ui, const wchar_t* label, const char* key, double fallback, double lo, double hi, double step,
+                    const wchar_t* format) -> void
+    {
+        const double was = setting(key, fallback);
+        const double now = ui.slider(label, was, lo, hi, {.step = step, .format = format});
+        if (std::abs(now - was) > 1e-6) change(key, now);
+    }
+
     auto page(wcmods::Ui& ui) -> void
     {
         ui.heading(L"Real-time combat");
@@ -180,6 +218,21 @@ namespace
         const bool now = ui.on_off(L"Real-time combat in Sandbox mode", was);
         if (now != was) set_enabled(now);
         ui.field(L"Locked on to", rtc::lockon::locked() ? rtc::lockon::state().model : std::wstring(L"nothing"));
+
+        ui.section(L"How it plays", [](wcmods::Ui& ui) {
+            slider_row(ui, L"Your cat's damage", "cat_damage", 1, 0.25, 4, 0.25, L"x%.2f");
+            slider_row(ui, L"The animals' health", "enemy_health", 1, 0.25, 4, 0.25, L"x%.2f");
+            slider_row(ui, L"The animals' damage", "enemy_damage", 1, 0, 4, 0.25, L"x%.2f");
+            const bool fight = flag("animals_fight_back", true);
+            if (ui.on_off(L"The animals fight back", fight) != fight) change("animals_fight_back", !fight);
+            slider_row(ui, L"An animal this near joins a fight", "engage_range_m", 4, 0, 15, 1, L"%.0f m");
+            slider_row(ui, L"Drinks in the flask", "flask_charges", 3, 0, 10, 1, L"%.0f");
+            slider_row(ui, L"Each drink gives back", "flask_heal", 0.4, 0.1, 1, 0.05, L"x%.2f of your cat's health");
+            slider_row(ui, L"Lock-on reaches", "lock_on_reach_m", 15, 5, 40, 1, L"%.0f m");
+        }, true);
+
+        ui.note(L"The keys (keyboard and controller) are in the mod's settings.json, by Unreal's key names; restart the game "
+                L"after changing them.");
         ui.field(L"Lock on", rtc::input::keys_of(rtc::input::Action::Lock));
         ui.field(L"Next target", std::format(L"{} (right), {} (left)", rtc::input::keys_of(rtc::input::Action::NextRight),
                                              rtc::input::keys_of(rtc::input::Action::NextLeft)));
