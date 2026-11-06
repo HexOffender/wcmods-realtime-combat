@@ -6,7 +6,7 @@
 //
 // Shared for tests and other mods (WCModsCpp.mods["realtime-combat"].get(name)): "locked" (true or false), "target"
 // (the animal's address, as Lua's GetAddress() gives it; 0 for none), "target_model" (its mesh's name, L"SK_Mice"),
-// "released" (why the last lock ended: "key", "gone", "too-far", "unseen", "off"), "marker" (whether the marker shows).
+// "released" (why the last lock ended: "key", "gone", "defeated", "too-far", "unseen", "off"), "marker" (whether the marker shows).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -14,6 +14,7 @@
 #include <format>
 #include <string>
 
+#include "enemies.hpp"
 #include "game.hpp"
 #include "input.hpp"
 #include "rules.hpp"
@@ -115,7 +116,7 @@ namespace rtc::lockon
         for (const wcmods::Animal& a : wcmods::animals(ls.range + 100))
         {
             auto where = game::at(a.actor);
-            if (!where) continue;
+            if (!where || enemies::defeated(a.actor)) continue;
             out.push_back({a.actor, Candidate{game::id(a.actor), *where, game::can_see(a.actor)}});
         }
         return out;
@@ -211,6 +212,11 @@ namespace rtc::lockon
         else if (s.target && p[input::Action::NextLeft]) next(-1);
         if (!s.target) return;
 
+        if (enemies::defeated(s.target))
+        {
+            release("defeated");
+            return;
+        }
         const bool gone = !game::staying(s.target);
         auto me = game::at(wcmods::player());
         auto them = gone ? std::nullopt : game::at(s.target);

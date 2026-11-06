@@ -107,7 +107,13 @@
     <ClCompile Include="cpp\src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpp\src\attacks.hpp" />
+    <ClInclude Include="cpp\src\enemies.hpp" />
+    <ClInclude Include="cpp\src\game.hpp" />
+    <ClInclude Include="cpp\src\input.hpp" />
+    <ClInclude Include="cpp\src\lockon.hpp" />
     <ClInclude Include="cpp\src\rules.hpp" />
+    <ClInclude Include="cpp\src\stamina.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp\CMakeLists.txt" />

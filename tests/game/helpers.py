@@ -88,6 +88,7 @@ end
 if not yaw then return "no level ground round your cat for the scene" end
 local pitch = Game.controller():GetControlRotation().Pitch
 Game.controller():SetControlRotation({ Pitch = pitch, Yaw = yaw, Roll = 0 })
+Game.player():K2_SetActorRotation({ Pitch = 0, Yaw = yaw, Roll = 0 }, false)   -- your cat faces that way too
 WCMODS_SCENE_YAW = yaw
 for _, n in ipairs(Game.animals.near(3000)) do Game.animals.remove(n.actor) end
 WCMODS_SCENE = {}
