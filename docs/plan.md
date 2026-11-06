@@ -74,7 +74,7 @@ buttons and shoulders are taken).
 
 | Step | Status |
 |---|---|
-| 1. The mod, and the Sandbox gate | built, tested in game (4 of 4), in review; with wcmods-sandbox's 0.7 |
+| 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
 | 2. Lock-on | |
 | 3. Attacks, stamina and enemy health | |
 | 4. Dodge | |
