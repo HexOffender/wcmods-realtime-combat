@@ -61,8 +61,8 @@ def _check(samples, way):
     is clockwise round the rabbit seen from above (Unreal's yaw goes up turning right): your cat's angle round the rabbit
     goes down, and it faces 90 degrees less than that angle. The game turns a cat toward the way it's asked to go at
     about 80 degrees a second, so the first second is its swing onto the circle: the facing's checked after."""
-    walking = [s for s in samples if s["side"] == way]
-    assert len(walking) >= 5, f"circling was {[s['side'] for s in samples]}, not {way}"
+    walking = [s for s in samples if s.get("side") == way]
+    assert len(walking) >= 5, f"circling was {[s.get('side') for s in samples]}, not {way}"
     turned = sum(h.turn(a["around"], b["around"]) for a, b in zip(samples, samples[1:]))
     assert turned * way < 0, f"went round {turned:.0f} degrees, the wrong way"
     assert abs(turned) > 45, f"went only {turned:.0f} degrees round the rabbit"

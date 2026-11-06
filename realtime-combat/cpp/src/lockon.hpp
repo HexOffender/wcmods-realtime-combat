@@ -111,6 +111,8 @@ namespace rtc::lockon
         s.unseen_for = 0;
         s.sight_check = 0;
         s.seen = true;
+        s.circle_side = 0;
+        wcmods::share("circling", 0);
         wcmods::log(L"locked on to {}", s.model);
         share();
     }
@@ -261,7 +263,8 @@ namespace rtc::lockon
             Rot r = lock_rotation(*now, *me, *them, dt, ls);
             // left or right: your cat walks forward round the target (rules.hpp's circle_yaw); walking in or out as well,
             // the circle's size follows
-            auto [forward, right] = game::move_input();
+            // (the keys read only while your cat's moving: standing still, it's not circling)
+            auto [forward, right] = game::speed(wcmods::player()) > 20 ? game::move_input() : std::pair{0.0, 0.0};
             const int side = circling(right);
             if (side != 0)
             {

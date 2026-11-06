@@ -174,11 +174,21 @@ namespace rtc::game
     // scene, on a camera spline's other camera.
     inline auto camera_actor() -> UObject*
     {
+        static wcmods::UClass* camera_class = nullptr;   // found once
+        if (!camera_class) camera_class = wcmods::find_class(STR("/Script/SwtAdventure.SwtAdventureCameraActor"));
         UObject* manager = wcmods::get(wcmods::controller(), L"PlayerCameraManager").object;
         UObject* target = wcmods::get(manager, L"ViewTarget.Target").object;
-        return target && wcmods::is_a(target, STR("/Script/SwtAdventure.SwtAdventureCameraActor")) ? target : nullptr;
+        return target && camera_class && target->IsA(camera_class) ? target : nullptr;
     }
     inline auto camera_yaw() -> std::optional<double> { return facing(camera_actor()); }
+    // Which way the view shown looks (the camera manager's: the camera's root, eased, leaning toward where your cat
+    // walks), which the game walks your cat relative to.
+    inline auto shown_yaw() -> std::optional<double>
+    {
+        auto r = wcmods::call_reflected(wcmods::get(wcmods::controller(), L"PlayerCameraManager").object, STR("GetCameraRotation"));
+        if (!r) return std::nullopt;
+        return wcmods::get(r->get(L"ReturnValue"), L"Yaw").number();
+    }
     // Which way the player's looking: the game's camera, else the controller (in a scene, say).
     inline auto view_yaw() -> std::optional<double>
     {
