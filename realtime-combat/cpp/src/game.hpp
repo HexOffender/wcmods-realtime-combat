@@ -201,6 +201,48 @@ namespace rtc::game
                }).has_value();
     }
 
+    // The roaming animals near your cat. wcmods::animals() walks every object in the game to find them, which costs
+    // (several a second made the game stutter), so the mod does it at most twice a second, for those within 5,000
+    // units, and everything in it shares that list: animals(radius) gives those within `radius` now (along the ground,
+    // as wcmods::animals measures), nearest first.
+    struct Near
+    {
+        std::vector<wcmods::Animal> all;
+        double age = 1e9;   // seconds since the search
+    };
+    inline auto near_state() -> Near&
+    {
+        static Near n;
+        return n;
+    }
+    inline auto tick(double dt) -> void { near_state().age += dt; }
+    inline auto forget_animals() -> void { near_state() = {}; }
+    inline auto animals(double radius) -> std::vector<wcmods::Animal>
+    {
+        Near& n = near_state();
+        if (n.age > 0.5)
+        {
+            n.all = wcmods::animals(5000);
+            n.age = 0;
+        }
+        std::vector<wcmods::Animal> out;
+        auto me = at(wcmods::player());
+        if (!me) return out;
+        for (const wcmods::Animal& a : n.all)
+        {
+            if (!staying(a.actor)) continue;
+            auto where = at(a.actor);
+            if (!where) continue;
+            const double d = flat_distance(*me, *where);
+            if (d > radius) continue;
+            wcmods::Animal copy = a;
+            copy.distance = d;
+            out.push_back(std::move(copy));
+        }
+        std::sort(out.begin(), out.end(), [](const wcmods::Animal& p, const wcmods::Animal& q) { return p.distance < q.distance; });
+        return out;
+    }
+
     // Move a cat or an animal along the ground by `step` cm the way `yaw` points, as its own movement would: its body
     // swept along (K2_SetActorLocation with a sweep), so it stops against whatever's in the way, a wall, a rock or an
     // animal, and its height kept over the ground. For moves the game's own movement won't make: while one of the
@@ -236,7 +278,7 @@ namespace rtc::game
         auto after = at(actor);
         if (!after) return false;
         auto animal_ahead = [&] {
-            for (const wcmods::Animal& a : wcmods::animals(300))
+            for (const wcmods::Animal& a : animals(300))
                 if (auto where = at(a.actor); where && a.actor != actor && flat_distance(*after, *where) < 90) return true;
             return false;
         };

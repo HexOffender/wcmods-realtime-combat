@@ -100,7 +100,7 @@ namespace rtc::attacks
         const AttackSpec& sp = spec(a);
         int32_t* level = wcmods::cat().level();
         const double damage = cat_damage(a, level ? *level : 1, s.damage_multiplier);
-        for (const wcmods::Animal& animal : wcmods::animals(sp.reach + 200))
+        for (const wcmods::Animal& animal : game::animals(sp.reach + 200))
         {
             if (enemies::defeated(animal.actor)) continue;
             auto them = game::at(animal.actor);

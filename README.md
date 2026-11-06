@@ -18,7 +18,10 @@ play a Sandbox mode cat:
   is gone (step 3);
 - **Left Alt** dodges about 3 m the way you're moving (standing still: back); nothing hurts your cat for its
   first moment. It costs stamina, and can cut an attack short once the attack has landed (step 4).
-- walking into an animal no longer starts the game's fight either: its body blocks your cat.
+- walking into an animal no longer starts the game's fight either: its body blocks your cat;
+- **the animals fight back** (step 5): one within 4 m, or one you hit, comes after your cat and attacks with its
+  own animations, one at a time, each with a wind-up you can see coming: dodge it, or hit the animal in its wind-up
+  to make it reel. Beaten prey goes on your Clan's fresh-kill pile. Run far enough and it gives up.
 
 The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
 and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's
