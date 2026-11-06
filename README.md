@@ -15,7 +15,10 @@ play a Sandbox mode cat:
   right or left; Tab again lets go (step 2);
 - **F** is a light attack and **G** a heavy one; F while running (Shift) is a lunge. They cost stamina, and
   hit the animals in front of your cat; an animal's health is the mod's own, and at none left it falls and
-  is gone (step 3).
+  is gone (step 3);
+- **Left Alt** dodges about 3 m the way you're moving (standing still: back); nothing hurts your cat for its
+  first moment. It costs stamina, and can cut an attack short once the attack has landed (step 4).
+- walking into an animal no longer starts the game's fight either: its body blocks your cat.
 
 The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
 and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's

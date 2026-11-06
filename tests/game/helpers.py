@@ -81,6 +81,8 @@ for k = 0, 7 do
         local x, y = me.X + math.cos(r) * place[2], me.Y + math.sin(r) * place[2]
         local g = Game.ground(x, y, me.Z + 300)
         if not g or math.abs(g - me.Z) > 120 then ok = nil break end
+        -- and nothing in the way at your cat's height (a rock, a bush, a log)
+        if Game.trace({ X = me.X, Y = me.Y, Z = me.Z + 10 }, { X = x, Y = y, Z = math.max(me.Z, g + 30) + 10 }) then ok = nil break end
         ok[name] = { X = x, Y = y, Z = g + 30 }
     end
     if ok then yaw, spots = try, ok break end
@@ -92,7 +94,7 @@ Game.player():K2_SetActorRotation({ Pitch = 0, Yaw = yaw, Roll = 0 }, false)   -
 WCMODS_SCENE_YAW = yaw
 for _, n in ipairs(Game.animals.near(3000)) do Game.animals.remove(n.actor) end
 WCMODS_SCENE = {}
-for name, spot in pairs(spots) do
+for name, spot in pairs(%(spawn)s and spots or {}) do
     local a, why = Game.animals.spawn("%(kind)s", spot)
     if not a then return "couldn't spawn " .. name .. ": " .. tostring(why) end
     Game.ai.stop(a)
@@ -102,9 +104,9 @@ return true
 """
 
 
-def scene(agent, places, kind=RABBIT):
+def scene(agent, places, kind=RABBIT, spawn=True):
     """Put animals around your cat: places = {name: (degrees right of the camera, distance)}. Gives each one's
-    address."""
+    address. spawn=False: only the camera and your cat turned to where every place is level and clear."""
     # the camera still first: on a fresh game it turns a while after the level loads
     end = time.time() + 10
     last = control_yaw(agent)
@@ -115,9 +117,12 @@ def scene(agent, places, kind=RABBIT):
             break
         last = now
     lua_places = "{" + ", ".join(f'{n} = {{{a}, {d}}}' for n, (a, d) in places.items()) + "}"
-    got = agent.lua(SCENE % {"places": lua_places, "kind": kind}, timeout=30)
+    if not places:   # a scene of nothing: still a level way to face, and no animals near
+        lua_places = "{ here = {0, 300} }"
+        spawn = False
+    got = agent.lua(SCENE % {"places": lua_places, "kind": kind, "spawn": "true" if spawn else "false"}, timeout=30)
     assert got is True, got
-    time.sleep(0.5)
+    time.sleep(1.3)   # the mod makes animals near ignore your cat once a second: these too, before anything comes near
     return agent.lua("local out = {} for n, a in pairs(WCMODS_SCENE) do out[n] = a:GetAddress() end return out")
 
 

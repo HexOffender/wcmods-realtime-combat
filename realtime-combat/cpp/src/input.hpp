@@ -8,6 +8,8 @@
 
 #include <array>
 #include <mutex>
+#include <optional>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,7 @@ namespace rtc::input
         Light,
         Heavy,
         Lunge,
+        Dodge,
         Count,
     };
 
@@ -41,6 +44,7 @@ namespace rtc::input
             {Action::Light, "light_attack", "light", {L"F"}},
             {Action::Heavy, "heavy_attack", "heavy", {L"G"}},
             {Action::Lunge, "lunge", "lunge", {}},   // the light attack while running; a key of its own if the settings give one
+            {Action::Dodge, "dodge", "dodge", {L"LeftAlt"}},
         };
         return all;
     }
@@ -79,6 +83,7 @@ namespace rtc::input
     struct Pressed
     {
         std::array<bool, static_cast<size_t>(Action::Count)> on{};
+        std::optional<double> dodge_way;   // tests only: the dodge's way, in degrees right of the camera's
         auto operator[](Action a) const -> bool { return on[static_cast<size_t>(a)]; }
     };
 
@@ -96,6 +101,14 @@ namespace rtc::input
             const std::string word = test.substr(0, test.find(' '));
             for (const Binding& b : bindings())
                 if (word == b.word) p.on[static_cast<size_t>(b.action)] = true;
+            // "dodge_left" and the like: a dodge that way, whatever keys are held
+            static const std::pair<const char*, double> ways[] = {{"dodge_forward", 0}, {"dodge_right", 90}, {"dodge_back", 180}, {"dodge_left", -90}};
+            for (auto& [w, way] : ways)
+                if (word == w)
+                {
+                    p.on[static_cast<size_t>(Action::Dodge)] = true;
+                    p.dodge_way = way;
+                }
         }
         return p;
     }

@@ -29,10 +29,14 @@ the next.
 - **Your cat's health is the game's** (`Cat::health()`, 178 of 178 on the test cat, on the HUD), and so is
   its stamina (`Cat::stamina()`, which running uses). The mod takes damage off and heals that health,
   and spends that stamina.
-- **The turn-based fights start two ways:** an animal that notices your cat chases it and catches it
-  within about 90 units, or your cat pounces on one (SpaceBar). `wcmods::ignore_player_everywhere(true)`
-  stops the first, and the second too: six pounces on animals ignoring your cat started no fight, and the
-  first pounce with them noticing it did (step 1's test checks both).
+- **The turn-based fights start three ways:** an animal that notices your cat chases it and catches it
+  within about 90 units, your cat pounces on one (SpaceBar), or your cat walks into one. Its body only
+  overlaps cats, and its `ExplorationEncounterCollision` capsule starts a fight when a cat overlaps it,
+  noticed or not. `wcmods::ignore_player_everywhere(true)` stops the first two (six pounces on animals
+  ignoring your cat started no fight; the first pounce with them noticing it did). For the third, while
+  the mod is on, each animal near has its encounter capsule ignoring cats and its body blocking them
+  (`bodies.hpp`, from step 4: a dodge slid your cat into a rabbit and a fight started). Its body only blocks
+  while it's in a fight with your cat (locked on to, or hit), so a Clan's patrols still pass through the rest.
 - **Keys:** most letters are already the game's. The left mouse button is Interact (it travels at a den
   entrance), the right one crouches, R resets the camera, Q tracks scents, SpaceBar pounces. Free: F, G,
   H, Z, B, N, Tab, Left Alt, the middle mouse button, 5 to 9.
@@ -77,7 +81,7 @@ buttons and shoulders are taken).
 | 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
 | 2. Lock-on | done: #2 |
 | 3. Attacks, stamina and enemy health | done: #3 |
-| 4. Dodge | |
+| 4. Dodge | done: #4 (with the animals' bodies, below) |
 | 5. Enemies fight back | |
 | 6. The flask | |
 | 7. The HUD, and falling | |
@@ -135,6 +139,10 @@ buttons and shoulders are taken).
 - Left Alt rolls your cat the way it's moving (or back, standing still): `Dodge_L` or `Dodge_R` by the
   side, the cat launched along the ground about 3 m. For the first part of it nothing hurts your cat. It
   costs stamina and can't be done during an attack's wind-up.
+- **Found:** each side hop is 2 s (crouched to 0.3 s, in the air 0.4 to 0.8 s, landed by 1.0 s); a dodge plays
+  0.25 to 1.15 s at 1.4 times. Forward and back, there's no hop that way, so your cat's turned for its right hop
+  to go that way. The slide sweeps your cat's body along, so it stops at an animal or a wall, and steps up 30 cm
+  over a stone or tuft the way walking does; teleported instead, it could end inside an animal.
 - Tests: a dodge moves the cat about 3 m the right way, costs stamina, and a hit in its first part does
   nothing.
 

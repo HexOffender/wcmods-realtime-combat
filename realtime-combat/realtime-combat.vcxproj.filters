@@ -19,6 +19,12 @@
     <ClInclude Include="cpp\src\attacks.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="cpp\src\bodies.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpp\src\dodge.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="cpp\src\enemies.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>

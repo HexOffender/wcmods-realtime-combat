@@ -4,10 +4,11 @@
 // The Sandbox gate (step 1): the mod is on while the Sandbox mode mod says a sandbox cat is being played (it shares
 // "Sandbox.ready" with C++ mods, read here with wcmods::shared) and settings.json's "enabled" is on. While it's on,
 // the roaming animals ignore your cat, so none chases it into a turn-based fight, and a pounce on one starts none
-// either (seen in game: six pounces with them ignoring your cat started no fight; the first without did).
+// either (seen in game: six pounces with them ignoring your cat started no fight; the first without did); and their
+// bodies block your cat with their encounter capsules off (bodies.hpp), so walking into one starts none either.
 //
-// Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp. Each runs
-// every frame while it's on.
+// Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp and the
+// stamina in stamina.hpp. The dodge (step 4): dodge.hpp. Each runs every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -19,6 +20,8 @@
 #include <string>
 
 #include "attacks.hpp"
+#include "bodies.hpp"
+#include "dodge.hpp"
 #include "enemies.hpp"
 #include "game.hpp"
 #include "input.hpp"
@@ -79,12 +82,18 @@ namespace
         {
             wcmods::ignore_player_everywhere(on);
             wcmods::share("on", on);
-            if (on) wcmods::log(L"on: real-time combat, the animals ignore your cat");
+            if (on)
+            {
+                rtc::bodies::frame(1.0);   // the animals near set at once
+                wcmods::log(L"on: real-time combat, the animals ignore your cat");
+            }
             else
             {
                 rtc::lockon::release("off");
                 rtc::attacks::end();
+                rtc::dodge::end();
                 rtc::stamina::clear();
+                rtc::bodies::clear();
                 rtc::enemies::clear();
                 wcmods::log(L"off ({}): the animals notice your cat again", rtc::why(off));
             }
@@ -97,10 +106,15 @@ namespace
     auto frame(float dt) -> void
     {
         if (!gate().on || !wcmods::player()) return;
-        const rtc::input::Pressed pressed = rtc::input::poll();
+        rtc::bodies::frame(dt);
+        rtc::input::Pressed pressed = rtc::input::poll();
         rtc::lockon::frame(dt, pressed);
+        rtc::dodge::frame(dt, pressed);
+        if (rtc::dodge::busy())   // no attack starts mid-dodge
+            for (auto a : {rtc::input::Action::Light, rtc::input::Action::Heavy, rtc::input::Action::Lunge})
+                pressed.on[static_cast<size_t>(a)] = false;
         rtc::attacks::frame(dt, pressed);
-        rtc::stamina::frame(dt, rtc::attacks::busy());
+        rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy());
         rtc::enemies::frame(dt);
     }
 
@@ -108,7 +122,7 @@ namespace
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one and attack it.");
+                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one, attack it and dodge.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -120,6 +134,7 @@ namespace
                                              rtc::input::keys_of(rtc::input::Action::NextLeft)));
         ui.field(L"Light attack", rtc::input::keys_of(rtc::input::Action::Light) + L" (while running: a lunge)");
         ui.field(L"Heavy attack", rtc::input::keys_of(rtc::input::Action::Heavy));
+        ui.field(L"Dodge", rtc::input::keys_of(rtc::input::Action::Dodge) + L" (the way you're moving; standing still, back)");
         if (auto stamina = wcmods::cat().stamina()) ui.progress(L"Stamina", *stamina.value / std::max(1.0f, *stamina.max));
     }
 } // namespace

@@ -4,7 +4,7 @@ down by the rules' damage, and at none left it plays its "lose" animation and is
 near the end of one follows it; with no stamina, none is made. Rabbits are put out held still: one in front of your
 cat, one behind.
 
-Run as test_gate.py says."""
+Run as test_sandbox_gate.py says."""
 import os
 import sys
 import time
@@ -18,7 +18,7 @@ LEVEL_DAMAGE = "(8 + 1.1 * math.min(60, math.max(1, Game.cat():level())))"   # r
 
 
 def setup(agent):
-    assert agent.lua(f"return {h.MOD} ~= nil"), "Real-time combat isn't running: install it (test_gate.py)"
+    assert agent.lua(f"return {h.MOD} ~= nil"), "Real-time combat isn't running: install it (test_sandbox_gate.py)"
     h.turn_on(agent)
     if h.get(agent, "locked"):
         h.action(agent, "lock")

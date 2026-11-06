@@ -3,7 +3,7 @@ and follows it, the mouse wheel moves to the next one to a side, a marker sits o
 the animal's gone or too far, and when real-time combat goes off. Two rabbits are put out each time, held still: one
 straight ahead 700 units off, one nearer (500) but 40 degrees to the right.
 
-Run as test_gate.py says."""
+Run as test_sandbox_gate.py says."""
 import ctypes
 import os
 import sys
@@ -17,7 +17,7 @@ IDS = {}
 
 
 def setup(agent):
-    assert agent.lua(f"return {h.MOD} ~= nil"), "Real-time combat isn't running: install it (test_gate.py)"
+    assert agent.lua(f"return {h.MOD} ~= nil"), "Real-time combat isn't running: install it (test_sandbox_gate.py)"
     h.turn_on(agent)
     if h.get(agent, "locked"):
         h.action(agent, "lock")
@@ -42,7 +42,20 @@ def test_picks_the_one_in_the_middle(agent):
                                     f"with the view {view:.1f} degrees right of where the scene was put; "
                                     f"from {h.get(agent, 'last_pick')} (ahead {IDS['ahead']}, right {IDS['right']})")
     assert h.get(agent, "target_model") == "SK_Rabbit"
-    h.until_value(agent, "marker", True)
+    try:
+        h.until_value(agent, "marker", True)
+    except AssertionError as e:
+        raise AssertionError(f"{e}; the HUD: {h.get(agent, 'marker_hud')}") from None
+    # where the mod put it, against the engine's own projection of the rabbit (when that answers), in the UI's units
+    time.sleep(0.5)   # the camera settled on it
+    engine = agent.lua("""local a = WCMODS_SCENE.ahead:K2_GetActorLocation()
+        local gs = StaticFindObject('/Script/Engine.Default__GameplayStatics') local pos = {}
+        local ok = gs:ProjectWorldToScreen(Game.controller(), {X = a.X, Y = a.Y, Z = a.Z}, pos, false)
+        local scale = StaticFindObject('/Script/UMG.Default__WidgetLayoutLibrary'):GetViewportScale(Game.controller())
+        return ok and { pos.X / scale, pos.Y / scale } or false""")
+    if engine:
+        mine = (h.get(agent, "marker_x"), h.get(agent, "marker_y"))
+        assert abs(mine[0] - engine[0]) < 60 and abs(mine[1] - engine[1]) < 60, (mine, engine)
     agent.shot("lock-on-marker")
 
 
