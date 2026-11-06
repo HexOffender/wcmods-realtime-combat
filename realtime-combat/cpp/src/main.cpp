@@ -9,7 +9,8 @@
 //
 // Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp and the
 // stamina in stamina.hpp. The dodge (step 4): dodge.hpp. The animals fighting back (step 5): foes.hpp. The flask
-// (step 6): flask.hpp. Each runs every frame while it's on.
+// (step 6): flask.hpp. Blocking and parrying (step 7): guard.hpp, with your cat's hits taken in hurt.hpp. Each runs
+// every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -26,6 +27,8 @@
 #include "enemies.hpp"
 #include "flask.hpp"
 #include "foes.hpp"
+#include "guard.hpp"
+#include "hurt.hpp"
 #include "game.hpp"
 #include "input.hpp"
 #include "lockon.hpp"
@@ -99,6 +102,8 @@ namespace
                 rtc::attacks::end();
                 rtc::dodge::end();
                 rtc::flask::end();
+                rtc::blocking::clear();
+                rtc::hurt::clear();
                 rtc::foes::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
@@ -119,6 +124,20 @@ namespace
         rtc::bodies::frame(dt);
         rtc::input::Pressed pressed = rtc::input::poll();
         rtc::lockon::frame(dt, pressed);
+        rtc::hurt::frame(dt);
+        using rtc::input::Action;
+        auto drop = [&](std::initializer_list<Action> actions) {
+            for (Action a : actions) pressed.on[static_cast<size_t>(a)] = false;
+        };
+        // reeling from a hit, or a parry playing: nothing starts
+        if (rtc::hurt::reeling() || rtc::blocking::state().parry_left > 0)
+            drop({Action::Dodge, Action::Light, Action::Heavy, Action::Lunge, Action::Drink});
+        // an attack or a dodge drops a guard; a drink doesn't start behind one
+        if (rtc::blocking::state().guarding)
+        {
+            if (pressed[Action::Dodge] || pressed[Action::Light] || pressed[Action::Heavy] || pressed[Action::Lunge]) rtc::blocking::drop();
+            else drop({Action::Drink});
+        }
         if (rtc::flask::busy())   // no dodge or attack starts mid-drink
             for (auto a : {rtc::input::Action::Dodge, rtc::input::Action::Light, rtc::input::Action::Heavy, rtc::input::Action::Lunge})
                 pressed.on[static_cast<size_t>(a)] = false;
@@ -128,8 +147,10 @@ namespace
                 pressed.on[static_cast<size_t>(a)] = false;
         rtc::attacks::frame(dt, pressed);
         rtc::flask::frame(dt, pressed, !rtc::attacks::busy() && !rtc::dodge::busy());
-        if (pressed[rtc::input::Action::Hurt]) rtc::foes::hurt_cat(5);
-        rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy());
+        rtc::blocking::frame(dt, rtc::input::held(Action::Block),
+                          !rtc::attacks::busy() && !rtc::dodge::busy() && !rtc::flask::busy() && !rtc::hurt::reeling());
+        if (pressed[Action::Hurt]) rtc::hurt::cat(5);
+        rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy() || rtc::blocking::state().guarding);
         // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
         if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
         else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
@@ -140,7 +161,7 @@ namespace
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: lock on, attack, dodge and drink from the flask; the animals fight back.");
+                L"Work in progress: lock on, attack, dodge, block and parry, drink from the flask; the animals fight back.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -153,6 +174,7 @@ namespace
         ui.field(L"Light attack", rtc::input::keys_of(rtc::input::Action::Light) + L" (while running: a lunge)");
         ui.field(L"Heavy attack", rtc::input::keys_of(rtc::input::Action::Heavy));
         ui.field(L"Dodge", rtc::input::keys_of(rtc::input::Action::Dodge) + L" (the way you're moving; standing still, back)");
+        ui.field(L"Block (just before a hit: parry)", rtc::input::keys_of(rtc::input::Action::Block) + L", held");
         ui.field(L"Drink from the flask", std::format(L"{} ({} of {} left; full again at camp, asleep, or coming into the forest)",
                                                      rtc::input::keys_of(rtc::input::Action::Drink), rtc::flask::state().charges,
                                                      rtc::flask::state().max));
@@ -177,6 +199,10 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::lockon::share();
         wcmods::every(0.25, update_gate);
         wcmods::every_frame(frame);
+
+        // (The block's on the right mouse button, where the game also crouches. Dropping the game's crouch command
+        // there doesn't stop it: the game keeps crouch going by the key itself (seen in game). It doesn't matter: while
+        // guarding, your cat stands still in its guard pose, which covers the crouch.)
 
         // The page below has the settings there are so far.
         wcmods::settings_page(false);

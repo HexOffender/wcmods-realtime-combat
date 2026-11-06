@@ -31,11 +31,12 @@ namespace rtc::enemies
         bool defeated = false;
         double gone_in = 0;   // seconds until a defeated one is taken out of the world
         int hits = 0;         // how many times your cat's hit it
+        double riposte_left = 0, riposte = 1;   // parried: seconds its next hit from your cat does `riposte` times
     };
     struct State
     {
         std::map<UObject*, Enemy> all;
-        int defeated = 0;
+        int defeated = 0, ripostes = 0;
         double health_multiplier = 1;
     };
     inline auto state() -> State&
@@ -88,6 +89,14 @@ namespace rtc::enemies
         return all.emplace(animal, e).first->second;
     }
 
+    // A parry: for `seconds`, your cat's next hit on it does `times` its damage.
+    inline auto open_to_riposte(UObject* animal, double seconds, double times) -> void
+    {
+        Enemy& e = of(animal);
+        e.riposte_left = seconds;
+        e.riposte = times;
+    }
+
     // Forget an animal (it's gone back to roaming): whole again if it fights another time.
     inline auto forget(UObject* animal) -> void
     {
@@ -130,6 +139,12 @@ namespace rtc::enemies
         Enemy& e = of(animal);
         if (e.defeated) return false;
         ++e.hits;
+        if (e.riposte_left > 0)   // a riposte: parried, open
+        {
+            damage *= e.riposte;
+            e.riposte_left = 0;
+            wcmods::share("ripostes", ++state().ripostes);
+        }
         e.health = after_hit(e.health, damage);
         share(animal, e);
         auto at = game::at(animal);
@@ -171,6 +186,7 @@ namespace rtc::enemies
         {
             UObject* animal = it->first;
             Enemy& e = it->second;
+            if (e.riposte_left > 0) e.riposte_left -= dt;
             if (!game::staying(animal))
             {
                 unshare(animal);

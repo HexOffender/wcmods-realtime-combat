@@ -37,6 +37,12 @@
     <ClInclude Include="cpp\src\game.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="cpp\src\guard.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpp\src\hurt.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="cpp\src\input.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>

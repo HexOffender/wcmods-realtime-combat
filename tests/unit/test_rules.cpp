@@ -285,12 +285,20 @@ static void foes_hit_back()
     // hit in its wind-up: it reels, then chases with a cooldown; after it's landed a hit doesn't stop it
     rtc::Foe h;
     rtc::step(h, s, 0.1, 120, 0, true, 2);
-    CHECK(rtc::stagger(h) && h.state == rtc::FoeState::Reel && !rtc::attacking(h));
+    CHECK(rtc::stagger(h, s.stagger) && h.state == rtc::FoeState::Reel && !rtc::attacking(h));
     CHECK(rtc::step(h, s, 0.6, 120, 0, true, 2) == rtc::FoeDo::EndAttack && h.state == rtc::FoeState::Chase);
     rtc::Foe k;
     rtc::step(k, s, 0.1, 120, 0, true, 2);
     rtc::step(k, s, 0.8, 120, 0, true, 2);   // landed
-    CHECK(!rtc::stagger(k));
+    CHECK(!rtc::stagger(k, s.stagger));
+    // parried, whatever it was doing: it reels as long as asked, then chases again
+    rtc::Foe p;
+    rtc::step(p, s, 0.1, 120, 0, true, 2);
+    rtc::step(p, s, 0.8, 120, 0, true, 2);   // landed: recovering
+    rtc::parried(p, 2.0);
+    CHECK(p.state == rtc::FoeState::Reel);
+    CHECK(rtc::step(p, s, 1.5, 120, 0, true, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(p, s, 0.6, 120, 0, true, 2) == rtc::FoeDo::EndAttack && p.state == rtc::FoeState::Chase);
     // too far for too long: it gives up
     rtc::Foe far;
     CHECK(rtc::step(far, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
@@ -377,8 +385,31 @@ static void the_flask()
     CHECK(rtc::travelled({0, 0, 0}, {4000, 0, 0}) && !rtc::travelled({0, 0, 0}, {50, 0, 0}));
 }
 
+static void guarding()
+{
+    const rtc::GuardSpec g;
+    // not guarding, or hit from behind: the whole of it
+    auto r = rtc::guard(false, 1, true, 100, 20);
+    CHECK(r.what == rtc::Guarded::Hit && near(r.health, 20) && near(r.stamina, 0));
+    r = rtc::guard(true, 1, false, 100, 20);
+    CHECK(r.what == rtc::Guarded::Hit && near(r.health, 20));
+    // guarding: a quarter, the rest off stamina
+    r = rtc::guard(true, 1, true, 100, 20);
+    CHECK(r.what == rtc::Guarded::Blocked && near(r.health, 5) && near(r.stamina, 20));
+    // too little stamina: the guard breaks, the chip taken, the stamina gone
+    r = rtc::guard(true, 1, true, 12, 20);
+    CHECK(r.what == rtc::Guarded::GuardBroken && near(r.health, 5) && near(r.stamina, 12));
+    // begun just before it lands: a parry, nothing taken
+    r = rtc::guard(true, 0.1, true, 0, 20);
+    CHECK(r.what == rtc::Guarded::Parried && near(r.health, 0) && near(r.stamina, 0));
+    CHECK(rtc::guard(true, g.parry_window + 0.01, true, 100, 20).what == rtc::Guarded::Blocked);
+    CHECK(rtc::parry_duration(g) > 0.3 && rtc::parry_duration(g) < 1);
+    CHECK(rtc::code(rtc::Guarded::GuardBroken) == "guard-broken");
+}
+
 int main()
 {
+    guarding();
     the_flask();
     circling_keeps_to_the_circle();
     foes_hit_back();
