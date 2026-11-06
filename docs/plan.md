@@ -31,7 +31,8 @@ the next.
   and spends that stamina.
 - **The turn-based fights start two ways:** an animal that notices your cat chases it and catches it
   within about 90 units, or your cat pounces on one (SpaceBar). `wcmods::ignore_player_everywhere(true)`
-  stops the first. The second is checked in step 1.
+  stops the first, and the second too: six pounces on animals ignoring your cat started no fight, and the
+  first pounce with them noticing it did (step 1's test checks both).
 - **Keys:** most letters are already the game's. The left mouse button is Interact (it travels at a den
   entrance), the right one crouches, R resets the camera, Q tracks scents, SpaceBar pounces. Free: F, G,
   H, Z, B, N, Tab, Left Alt, the middle mouse button, 5 to 9.
@@ -71,6 +72,17 @@ buttons and shoulders are taken).
 
 ## Steps
 
+| Step | Status |
+|---|---|
+| 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
+| 2. Lock-on | |
+| 3. Attacks, stamina and enemy health | |
+| 4. Dodge | |
+| 5. Enemies fight back | |
+| 6. The flask | |
+| 7. The HUD, and falling | |
+| 8. The controller, settings, and the release | |
+
 ### 1. The mod, and the Sandbox gate
 
 - A new repository, `HexOffender/wcmods-realtime-combat`, with the mod in `realtime-combat/` (made from
@@ -79,8 +91,8 @@ buttons and shoulders are taken).
   with the Sandbox mod's version bumped.
 - The mod: on while `Sandbox.ready` (and its own "Real-time combat" setting) is on. While it's on, the
   animals ignore your cat (`ignore_player_everywhere`), so none starts a turn-based fight; off, they
-  notice it again. A pounce on an animal mustn't start one either: if it does, the mod stops it (to be
-  found: the pounce's command dropped near an animal, or the fight's start).
+  notice it again. A pounce on an animal ignoring your cat starts no fight either (seen in game), so
+  nothing more is needed for pounces.
 - A page in the mod menu: whether it's on, and why not.
 - Tests: on in sandbox, off out of it; an animal walked into doesn't start a fight while on, and does
   while off; a pounce doesn't start one; with the real Sandbox mode mod on a sandbox cat, it's on.
@@ -161,7 +173,8 @@ buttons and shoulders are taken).
 
 ## Open questions, found along the way
 
-- Whether a pounce starts a fight while the animals ignore your cat (step 1).
+- ~~Whether a pounce starts a fight while the animals ignore your cat~~: it doesn't (step 1). Step 5 checks
+  it again for an animal the mod is moving (its own logic stopped).
 - What the game does with a cat at no health outside a fight (step 7; the mod steps in first either way).
 - Whether the game's experience can be given from C++ (step 5); if not, rewards are items.
 - The game's attacks were made for staged fights: some (throws, sand, rocks) may look odd up close, and

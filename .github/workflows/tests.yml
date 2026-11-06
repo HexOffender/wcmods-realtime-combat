@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The rules' unit tests (g++)
+        run: python3 tests/unit/run.py
+      - name: The in-game tests compile
+        run: python3 -m py_compile tests/game/*.py
+      - name: The mod's JSON files read
+        run: |
+          python3 -c "import json; [json.load(open(p, encoding='utf-8')) for p in ('realtime-combat/mod.json', 'realtime-combat/settings.json')]"

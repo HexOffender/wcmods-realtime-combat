@@ -1,0 +1,16 @@
+{
+  "name": "Real-time combat",
+  "description": "Real-time fights in place of the game's turn-based ones while you play a Sandbox mode cat: lock on, attack, dodge, heal from a flask. Work in progress. Needs the Sandbox mode mod (0.7 or later), UE4SS and code mods allowed.",
+  "version": "0.1.0",
+  "author": "HexOffender",
+  "enabled": true,
+  "game_builds": [
+    26337109
+  ],
+  "requires": [
+    "sandbox"
+  ],
+  "uses": [
+    "mod-menu"
+  ]
+}
