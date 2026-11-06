@@ -1,12 +1,14 @@
 // lockon.hpp: step 2, lock-on. The lock key picks the animal nearest the middle of the view (rules.hpp's pick_target),
-// the camera turns toward it every frame (lock_rotation), the mouse wheel moves to the next one to a side
+// the camera turns toward it every frame (lock_rotation), left or right walks your cat forward in a circle round it
+// (circle_yaw: a cat can't walk sideways), the mouse wheel moves to the next one to a side
 // (next_target), and a marker sits on it on the HUD. It lets go on the key again, or when the animal's gone, too far
 // or out of sight a while (keep_lock); with nothing to lock on to, the key puts the camera behind your cat, as the
 // game's camera reset does.
 //
 // Shared for tests and other mods (WCModsCpp.mods["realtime-combat"].get(name)): "locked" (true or false), "target"
 // (the animal's address, as Lua's GetAddress() gives it; 0 for none), "target_model" (its mesh's name, L"SK_Mice"),
-// "released" (why the last lock ended: "key", "gone", "defeated", "too-far", "unseen", "off"), "marker" (whether the marker shows).
+// "released" (why the last lock ended: "key", "gone", "defeated", "too-far", "unseen", "off"), "marker" (whether the marker shows),
+// "circling" (+1 round to the right, -1 to the left, 0 not).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -34,6 +36,8 @@ namespace rtc::lockon
         wcmods::Widget marker;     // on the HUD's CanvasExploration
         wcmods::Widget canvas;
         double hud_check = 0;      // seconds to the next look for the HUD (finding it again is a search)
+        int circle_side = 0;       // circling round the target: +1 right, -1 left, 0 not
+        double r0 = 0;             // the circle's size (cm from the target)
     };
     inline auto state() -> State&
     {
@@ -89,6 +93,8 @@ namespace rtc::lockon
     {
         State& s = state();
         if (!s.target) return;
+        if (s.circle_side != 0) wcmods::share("circling", 0);
+        s.circle_side = 0;
         wcmods::log(L"lock-on let go ({})", wcmods::wide(why));
         s.target = nullptr;
         s.model.clear();
@@ -105,6 +111,8 @@ namespace rtc::lockon
         s.unseen_for = 0;
         s.sight_check = 0;
         s.seen = true;
+        s.circle_side = 0;
+        wcmods::share("circling", 0);
         wcmods::log(L"locked on to {}", s.model);
         share();
     }
@@ -138,15 +146,15 @@ namespace rtc::lockon
             return;
         }
         auto me = game::at(wcmods::player());
-        auto view = game::control_rotation();
+        auto view = game::view_yaw();
         if (!me || !view) return;
         const LockSettings ls = settings();
         auto all = candidates(ls);
-        const int i = pick_target(*me, view->yaw, only(all), ls);
+        const int i = pick_target(*me, *view, only(all), ls);
         // What it chose from, for tests: each one's address, distance, degrees right of the view, and whether seen.
         std::string seen;
         for (auto& [actor, c] : all)
-            seen += std::format("{}:{:.0f}:{:.0f}:{} ", c.id, distance(*me, c.at), turn(view->yaw, yaw_to(*me, c.at)),
+            seen += std::format("{}:{:.0f}:{:.0f}:{} ", c.id, distance(*me, c.at), turn(*view, yaw_to(*me, c.at)),
                                 c.seen ? "seen" : "unseen");
         wcmods::share("last_pick", seen);
         if (i < 0)
@@ -247,7 +255,27 @@ namespace rtc::lockon
             release(code(r));
             return;
         }
-        if (auto now = game::control_rotation()) game::set_control_rotation(lock_rotation(*now, *me, *them, dt, ls));
+        if (auto now = game::control_rotation())
+        {
+            // the game's camera turns from its own root, not the controller: lock-on turns that root (and the
+            // controller with it, for anything that reads the controller)
+            if (auto root = game::camera_yaw()) now->yaw = *root;
+            Rot r = lock_rotation(*now, *me, *them, dt, ls);
+            // left or right: your cat walks forward round the target (rules.hpp's circle_yaw); walking in or out as well,
+            // the circle's size follows
+            // (the keys read only while your cat's moving: standing still, it's not circling)
+            auto [forward, right] = game::speed(wcmods::player()) > 20 ? game::move_input() : std::pair{0.0, 0.0};
+            const int side = circling(right);
+            if (side != 0)
+            {
+                if (side != s.circle_side || std::abs(forward) > CircleSettings{}.side_input) s.r0 = flat_distance(*me, *them);
+                r.yaw = circle_yaw(*me, *them, s.r0, side);
+            }
+            if (side != s.circle_side) wcmods::share("circling", side);
+            s.circle_side = side;
+            game::set_camera_yaw(r.yaw);
+            game::set_control_rotation(r);
+        }
         place_marker(dt);
     }
 } // namespace rtc::lockon

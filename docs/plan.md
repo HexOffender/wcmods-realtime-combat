@@ -21,8 +21,11 @@ the next.
   `AM_Mice_Rodent_Bite` on a mouse.
 - **The dodge doesn't move the cat** (no root motion): it stayed on its spot. The mod moves it.
   `LaunchCharacter` does (a sideways shove moved it about a metre).
-- **The camera follows the controller's rotation:** `SetControlRotation` turned the view 90 degrees. Lock-on
-  turns it toward the target each frame.
+- **The camera turns from its own root, not the controller:** the game's exploration camera
+  (`BP_AdventureCamera`) takes its root's yaw each frame and adds that frame's turn input, and while your cat
+  walks it swings behind it whatever the controller says (wcmods' docs/reverse-engineering.md, "The exploration
+  camera"). The game walks your cat relative to that camera. So lock-on turns the camera's root (#6; until then it
+  turned the controller, which only looked right standing still).
 - **Animals have no health out of a fight.** Their stats only exist once a turn-based fight starts
   (`WrcTurnBasedCombatComponent`), so an animal's health in a real-time fight is the mod's own, scaled
   from its level the way the game scales a fighter's.
@@ -79,13 +82,14 @@ buttons and shoulders are taken).
 | Step | Status |
 |---|---|
 | 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
-| 2. Lock-on | done: #2 |
+| 2. Lock-on | done: #2; circling and the camera's own turning: #6 |
 | 3. Attacks, stamina and enemy health | done: #3 |
 | 4. Dodge | done: #4 (with the animals' bodies, below) |
 | 5. Enemies fight back | done: #5 |
 | 6. The flask | |
-| 7. The HUD, and falling | |
-| 8. The controller, settings, and the release | |
+| 7. Blocking and parrying | |
+| 8. The HUD, and falling | |
+| 9. The controller, settings, and the release | |
 
 ### 1. The mod, and the Sandbox gate
 
@@ -111,6 +115,12 @@ buttons and shoulders are taken).
 - A marker on the target (an overlay on its body, projected each frame).
 - Tests: the nearest-to-the-middle animal is picked, the camera turns to it, the wheel switches, out of
   reach lets go.
+- **Circling** (#6, asked for after step 5): a cat can't walk sideways, so locked on, left or right walks your cat
+  forward in a circle round the target, curving as it goes. With the camera on the line from your cat to the
+  target, the game's own "right" is the circle's way round; the camera's held exactly on that line, turned a little
+  to keep to the circle's size (`circle_yaw`). Forward and back walk in and out, and the circle follows. The game
+  turns a cat toward the way it's asked at about 80 degrees a second, so from a standstill your cat swings onto the
+  circle over the first second (turning it faster from the mod didn't hold: the game turns it its own way).
 
 ### 3. Attacks, stamina and enemy health
 
@@ -178,16 +188,28 @@ buttons and shoulders are taken).
 - Tests: drinking heals by the right amount and spends a charge, none left does nothing, a hit stops it,
   the charges fill at camp.
 
-### 7. The HUD, and falling
+### 7. Blocking and parrying (added after step 5)
 
-- On screen: the target's health bar (its name and level above it), your cat's stamina under its health
-  bar, the flask and its charges.
+- **Block:** hold the right mouse button. The game's crouch on that button is held off while real-time combat
+  is on (Ctrl still crouches). A hit taken while blocking from in front does a quarter of its damage, and the rest
+  comes off stamina; with none left, the guard breaks (your cat staggers a moment, open).
+- **Parry:** start a block just before a hit lands (within about 0.2 s): no damage, and the animal's left reeling
+  for 2 s; your cat's next attack on it in that time does three times the damage (a riposte).
+- **Animations:** stand-ins from your cat's own fight moves for now (a guard pose held for the block, a hiss for
+  the parry: `StoneGuard`, `HunkerDown`, `HissingParry` in its table), to be animated properly later.
+- Tests: a blocked hit does a quarter and costs stamina, a guard breaks at no stamina, a parry stops the hit and
+  opens the animal to a riposte, and the right mouse button doesn't crouch while it's on.
+
+### 8. The HUD, and falling
+
+- On screen: a health bar over every animal your cat's hit (as the game shows names over cats), the target's
+  bigger, with its name and level; your cat's stamina under its health bar; the flask and its charges.
 - Your cat at no health doesn't die the game's way (unknown outside a fight): the mod catches it first,
   plays `Lose`, fades out, and sends your cat back to camp (the game's own return), full health, the flask
   filled, the animals that were fighting back to roaming.
 - Tests: the bars show and follow the numbers; falling sends your cat to camp, healed.
 
-### 8. The controller, settings, and the release
+### 9. The controller, settings, and the release
 
 - Controller buttons (after checking which the game leaves free in play), the settings page finished
   (keys, damage, health and stamina multipliers, flask charges, lock-on reach), README with how to play.

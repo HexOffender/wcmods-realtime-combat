@@ -60,7 +60,8 @@ def test_picks_the_one_in_the_middle(agent):
 
 
 def test_the_camera_turns_to_it_and_follows(agent):
-    """Locked on to the one to the right, the camera turns to it within a second or so; moved round, it follows."""
+    """Locked on to the one to the right, the camera turns to it within a second or so (the view shown, not only the
+    controller); moved round, it follows."""
     h.action(agent, "lock")
     h.until_value(agent, "locked", True)
     h.action(agent, "next_right")
@@ -68,6 +69,8 @@ def test_the_camera_turns_to_it_and_follows(agent):
     time.sleep(1.5)
     off = abs(h.turn(h.control_yaw(agent), h.yaw_to(agent, "right")))
     assert off < 5, f"the camera is {off:.1f} degrees off the target"
+    shown = abs(h.turn(h.shown_yaw(agent), h.yaw_to(agent, "right")))
+    assert shown < 12, f"the view shown is {shown:.1f} degrees off the target"
     # your cat moved 300 units to the side: the camera follows
     agent.lua("""local me, yaw = Game.cat():location(), math.rad(WCMODS_SCENE_YAW - 90)
         Game.cat():teleport(me.X + math.cos(yaw) * 300, me.Y + math.sin(yaw) * 300, me.Z + 20) return true""")
@@ -124,8 +127,7 @@ def test_off_lets_go(agent):
 
 def test_nothing_to_lock_on_to(agent):
     """With the camera turned away from both, the key locks on to nothing (and puts the camera behind your cat)."""
-    agent.lua("""local r = Game.controller():GetControlRotation()
-        Game.controller():SetControlRotation({ Pitch = r.Pitch, Yaw = WCMODS_SCENE_YAW + 180, Roll = 0 }) return true""")
+    h.set_view_yaw(agent, agent.lua("return WCMODS_SCENE_YAW") + 180)
     time.sleep(0.3)
     h.action(agent, "lock")
     time.sleep(0.5)

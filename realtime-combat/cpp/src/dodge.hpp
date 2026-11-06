@@ -6,7 +6,8 @@
 // attack short once the attack has landed.
 //
 // Shared for tests: "dodge" (true while one plays), "dodges" (how many made), "dodge_safe" (true while nothing hurts
-// your cat), "dodge_way" (the yaw it went), "dodge_refused" (dodges not made for want of stamina).
+// your cat), "dodge_safe_starts" (how many safe moments have begun), "dodge_way" (the yaw it went), "dodge_refused"
+// (dodges not made for want of stamina).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -28,7 +29,7 @@ namespace rtc::dodge
         double way = 0;          // the yaw it goes
         UObject* montage{};
         bool was_safe = false;
-        int made = 0, refused = 0;
+        int made = 0, refused = 0, safe_starts = 0;
     };
     inline auto state() -> State&
     {
@@ -60,7 +61,8 @@ namespace rtc::dodge
         State& s = state();
         UObject* me = wcmods::player();
         auto facing = game::facing(me);
-        auto view = game::control_rotation();
+        auto view = game::shown_yaw();   // the game walks your cat relative to the view shown
+        if (!view) view = game::view_yaw();
         if (!me || !facing || !view) return false;
         const DodgeSpec d;
         if (!stamina::spend(d.stamina))
@@ -68,11 +70,11 @@ namespace rtc::dodge
             wcmods::share("dodge_refused", ++s.refused);
             return false;
         }
-        if (way_from_camera) s.way = view->yaw + *way_from_camera;
+        if (way_from_camera) s.way = *view + *way_from_camera;
         else
         {
             auto [forward, right] = game::move_input();
-            s.way = dodge_yaw(view->yaw, *facing, forward, right);
+            s.way = dodge_yaw(*view, *facing, forward, right);
             // no movement key it knows held, but your cat's moving (keys moved by a remapper, say): that way
             if (std::hypot(forward, right) < 0.2)
                 if (auto moving = game::moving_yaw(me)) s.way = *moving;
@@ -84,6 +86,7 @@ namespace rtc::dodge
         s.elapsed = 0;
         s.was_safe = true;
         wcmods::share("dodge_safe", true);
+        wcmods::share("dodge_safe_starts", ++s.safe_starts);
         wcmods::share("dodge", true);
         wcmods::share("dodges", ++s.made);
         wcmods::share("dodge_way", s.way);

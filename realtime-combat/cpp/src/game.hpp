@@ -166,6 +166,38 @@ namespace rtc::game
                }).has_value();
     }
 
+    // The game's exploration camera, when it's what the player sees (the camera manager's view target): its root turns
+    // left and right. Each frame the game takes the root's yaw and adds that frame's turn input (the arrow keys, a
+    // stick, wcmods' mouse look), so a turn made to the root stays (docs/reverse-engineering.md in wcmods, "The
+    // exploration camera"). The controller's rotation isn't what it follows: it swings behind a walking cat whatever
+    // the controller says, and the game walks your cat relative to this camera (seen in game). nullptr in a fight, a
+    // scene, on a camera spline's other camera.
+    inline auto camera_actor() -> UObject*
+    {
+        static wcmods::UClass* camera_class = nullptr;   // found once
+        if (!camera_class) camera_class = wcmods::find_class(STR("/Script/SwtAdventure.SwtAdventureCameraActor"));
+        UObject* manager = wcmods::get(wcmods::controller(), L"PlayerCameraManager").object;
+        UObject* target = wcmods::get(manager, L"ViewTarget.Target").object;
+        return target && camera_class && target->IsA(camera_class) ? target : nullptr;
+    }
+    inline auto camera_yaw() -> std::optional<double> { return facing(camera_actor()); }
+    // Which way the view shown looks (the camera manager's: the camera's root, eased, leaning toward where your cat
+    // walks), which the game walks your cat relative to.
+    inline auto shown_yaw() -> std::optional<double>
+    {
+        auto r = wcmods::call_reflected(wcmods::get(wcmods::controller(), L"PlayerCameraManager").object, STR("GetCameraRotation"));
+        if (!r) return std::nullopt;
+        return wcmods::get(r->get(L"ReturnValue"), L"Yaw").number();
+    }
+    // Which way the player's looking: the game's camera, else the controller (in a scene, say).
+    inline auto view_yaw() -> std::optional<double>
+    {
+        if (auto c = camera_yaw()) return c;
+        if (auto r = control_rotation()) return r->yaw;
+        return std::nullopt;
+    }
+    inline auto set_camera_yaw(double yaw) -> bool { return set_facing(camera_actor(), yaw); }
+
     // Turn an actor (only it: not its controller, so the camera's left to lock-on's easing) to face another.
     inline auto turn_to(UObject* actor, UObject* other) -> bool
     {

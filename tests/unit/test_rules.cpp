@@ -305,8 +305,62 @@ static void foes_hit_back()
     CHECK(rtc::step(back, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
 }
 
+// Your cat walked as the game walks it: along the camera's right (side +1) or left, at `speed`, for `seconds`, the
+// camera set by circle_yaw each frame. How far round it went (degrees, + anticlockwise seen from above with Unreal's
+// axes) and its distance from the target at the end and at its farthest.
+struct Lap
+{
+    double turned, r_end, r_max, r_min;
+};
+static Lap walk_round(rtc::Vec start, rtc::Vec target, int side, double speed, double seconds, double r0)
+{
+    rtc::Vec me = start;
+    double turned = 0, last = rtc::yaw_to(target, me), r_max = 0, r_min = 1e9;
+    const double dt = 1.0 / 60;
+    for (double t = 0; t < seconds; t += dt)
+    {
+        const double cam = rtc::circle_yaw(me, target, r0, side);
+        const double way = (cam + 90 * side) / rtc::degrees_per_radian;
+        me.x += std::cos(way) * speed * dt;
+        me.y += std::sin(way) * speed * dt;
+        const double now = rtc::yaw_to(target, me);
+        turned += rtc::turn(last, now);
+        last = now;
+        const double r = rtc::flat_distance(me, target);
+        r_max = std::max(r_max, r);
+        r_min = std::min(r_min, r);
+    }
+    return {turned, rtc::flat_distance(me, target), r_max, r_min};
+}
+
+static void circling_keeps_to_the_circle()
+{
+    const rtc::Vec target{0, 0, 0};
+    // right, 3 m out, walking 1.75 m/s for a full lap's time: round once, the circle kept within 3%
+    const double r0 = 300, lap = 2 * 3.14159265 * r0 / 175;
+    Lap right = walk_round({0, -r0, 0}, target, +1, 175, lap, r0);
+    CHECK(std::abs(std::abs(right.turned) - 360) < 15);
+    CHECK(right.r_max < r0 * 1.03 && right.r_min > r0 * 0.97);
+    // left goes round the other way
+    Lap left = walk_round({0, -r0, 0}, target, -1, 175, lap, r0);
+    CHECK(left.turned * right.turned < 0);
+    CHECK(left.r_max < r0 * 1.03 && left.r_min > r0 * 0.97);
+    // started off the circle (1.5 times out): it's drawn back to it
+    Lap back = walk_round({0, -r0 * 1.5, 0}, target, +1, 175, 6, r0);
+    CHECK(std::abs(back.r_end - r0) < r0 * 0.1);
+    // running (4 m/s) round a close target keeps to it too
+    Lap run = walk_round({0, -150, 0}, target, +1, 400, 3, 150);
+    CHECK(run.r_max < 150 * 1.15 && run.r_min > 150 * 0.85);
+    // on the circle the camera's on the line to the target
+    CHECK(near(rtc::circle_yaw({0, -r0, 0}, target, r0, 1), 90));
+    // only enough left or right counts
+    CHECK(rtc::circling(0.8) == 1 && rtc::circling(-0.5) == -1 && rtc::circling(0.1) == 0);
+
+}
+
 int main()
 {
+    circling_keeps_to_the_circle();
     foes_hit_back();
     the_dodge();
     gate_is_on_only_for_a_sandbox_cat_in_the_world();

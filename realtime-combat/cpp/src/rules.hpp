@@ -218,6 +218,36 @@ namespace rtc
         return out;
     }
 
+    // Circling while locked on. A cat can't walk sideways, so with a lock on, the player's left or right walks it forward
+    // round the target: the game moves your cat along the camera's right (or left) and turns it to face the way it
+    // walks, so with the camera on the line from your cat to the target, right is the circle's way round and your cat
+    // curves left as it goes. The camera's held exactly on that line while circling (lock_rotation's easing lags a few
+    // degrees, which spirals your cat outward), turned a little so the walk keeps to the circle it started on, `r0` from
+    // the target: drifted out, the walk's tilted in; in, out. `side` is +1 for right, -1 for left.
+    struct CircleSettings
+    {
+        double side_input = 0.3;   // how much left or right counts as circling
+        double gain = 40;          // degrees of tilt for the whole circle's size off (kept within max_tilt)
+        double max_tilt = 25;
+    };
+    inline auto circle_yaw(Vec me, Vec target, double r0, int side, const CircleSettings& s = {}) -> double
+    {
+        const double r = flat_distance(me, target);
+        const double off = (r - r0) / std::max(r0, 50.0);
+        const double tilt = std::clamp(off * s.gain, -s.max_tilt, s.max_tilt);
+        return yaw_to(me, target) - (side > 0 ? 1 : -1) * tilt;
+    }
+    // Whether the player's asking to circle (enough left or right, from move_input's forward and right).
+    inline auto circling(double right, const CircleSettings& s = {}) -> int
+    {
+        if (right > s.side_input) return 1;
+        if (right < -s.side_input) return -1;
+        return 0;
+    }
+    // (The game walks a cat forward along its facing and turns it toward the way it's asked to go at about 80 degrees
+    // a second, seen in game: from a standstill your cat swings onto the circle over the first second or so. Turning
+    // it faster from here didn't hold: the game turns it its own way each frame.)
+
     // ------------------------------------------------------------------------------------------- attacks
     // Your cat's attacks are the fights' own animations, which are 4.3 s long: the cat crouches, runs in (the fights
     // warp it to its target), strikes at about 1.5 s and walks back. A real-time attack plays only the strike, from

@@ -83,11 +83,12 @@ def test_standing_still_goes_back(agent):
 
 def test_safe_then_not_and_stamina(agent):
     """Nothing hurts your cat at its start; after 0.4 s it can be hurt again. It costs 15 stamina."""
-    before = h.get(agent, "dodges") or 0
+    before, safe = h.get(agent, "dodges") or 0, h.get(agent, "dodge_safe_starts") or 0
     h.action(agent, "dodge_right")
     h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
-    assert h.get(agent, "dodge_safe") is True
     stamina = agent.lua("return Game.cat():stamina()")
+    # it was safe as it began (counted: 0.4 s is too short to be sure of catching it from here), and isn't now
+    assert (h.get(agent, "dodge_safe_starts") or 0) == safe + 1
     assert 83 <= stamina <= 86, stamina
     time.sleep(0.5)
     assert h.get(agent, "dodge_safe") is False
@@ -96,8 +97,7 @@ def test_safe_then_not_and_stamina(agent):
 def test_a_wall_stops_it(agent):
     """An animal in a fight with your cat (locked on to) 1.5 m to the right stops the hop short of it."""
     h.scene(agent, {"wall": (90, 150)})
-    agent.lua("""local r = Game.controller():GetControlRotation()
-        Game.controller():SetControlRotation({ Pitch = r.Pitch, Yaw = WCMODS_SCENE_YAW + 90, Roll = 0 }) return true""")
+    h.set_view_yaw(agent, agent.lua("return WCMODS_SCENE_YAW") + 90)
     time.sleep(0.3)
     h.action(agent, "lock")
     h.until_value(agent, "locked", True)
