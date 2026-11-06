@@ -7,9 +7,16 @@ screen. Story cats keep the game's own fights.
 
 It's a C++ mod made with [wcmods](https://github.com/HexOffender/warrior-cats-mods) and its C++ SDK.
 
-**Work in progress.** [docs/plan.md](docs/plan.md) has the plan and what each step adds. So far (step 1):
-while you play a Sandbox mode cat, the animals leave your cat alone, so no turn-based fight starts; the
-mod menu (Insert) has a Real-time combat page with a switch for it.
+**Work in progress.** [docs/plan.md](docs/plan.md) has the plan and what each step adds. So far, while you
+play a Sandbox mode cat:
+- the animals leave your cat alone, so no turn-based fight starts (step 1);
+- **Tab** (or the middle mouse button) locks on to the animal nearest the middle of the view, within 15 m:
+  the camera turns to it and follows it, and a marker sits on it. The mouse wheel moves to the next one to the
+  right or left; Tab again lets go (step 2).
+
+The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
+and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's
+added), read as the game starts: restart the game after changing them.
 
 ## What it needs
 

@@ -75,7 +75,7 @@ buttons and shoulders are taken).
 | Step | Status |
 |---|---|
 | 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
-| 2. Lock-on | |
+| 2. Lock-on | done: #2 |
 | 3. Attacks, stamina and enemy health | |
 | 4. Dodge | |
 | 5. Enemies fight back | |
