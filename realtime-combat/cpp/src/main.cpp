@@ -1,20 +1,25 @@
 // Real-time combat: the game's turn-based fights swapped for real-time ones while you play a Sandbox mode cat.
 // docs/plan.md, in this repository, has the plan and what each step adds.
 //
-// Step 1, the Sandbox gate: the mod is on while the Sandbox mode mod says a sandbox cat is being played (it shares
+// The Sandbox gate (step 1): the mod is on while the Sandbox mode mod says a sandbox cat is being played (it shares
 // "Sandbox.ready" with C++ mods, read here with wcmods::shared) and settings.json's "enabled" is on. While it's on,
 // the roaming animals ignore your cat, so none chases it into a turn-based fight, and a pounce on one starts none
 // either (seen in game: six pounces with them ignoring your cat started no fight; the first without did).
 //
+// Lock-on (step 2): lockon.hpp, every frame while it's on.
+//
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
-// "disabled", "no-sandbox"...).
+// "disabled", "no-sandbox"...), and lockon.hpp's.
 #include <WCMods/WCMods.hpp>
 
 #include <format>
 #include <mutex>
 #include <string>
 
+#include "game.hpp"
+#include "input.hpp"
+#include "lockon.hpp"
 #include "rules.hpp"
 
 namespace
@@ -59,7 +64,7 @@ namespace
     }
 
     // Looked at four times a second. Turning on makes every animal near ignore your cat (and those that come near
-    // later, a look a second); turning off puts them back.
+    // later, a look a second); turning off puts them back and lets go of a lock.
     auto update_gate() -> void
     {
         Gate& g = gate();
@@ -71,10 +76,38 @@ namespace
             wcmods::ignore_player_everywhere(on);
             wcmods::share("on", on);
             if (on) wcmods::log(L"on: real-time combat, the animals ignore your cat");
-            else wcmods::log(L"off ({}): the animals notice your cat again", rtc::why(off));
+            else
+            {
+                rtc::lockon::release("off");
+                wcmods::log(L"off ({}): the animals notice your cat again", rtc::why(off));
+            }
             g.on = on;
         }
         g.off = off;
+    }
+
+    // Every frame: the player's actions, while it's on (keys pressed while it's off do nothing of the mod's).
+    auto frame(float dt) -> void
+    {
+        const rtc::input::Pressed pressed = rtc::input::poll();
+        if (!gate().on || !wcmods::player()) return;
+        rtc::lockon::frame(dt, pressed);
+    }
+
+    auto page(wcmods::Ui& ui) -> void
+    {
+        ui.heading(L"Real-time combat");
+        ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
+                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one.");
+        const Gate& g = gate();
+        ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
+        const bool was = enabled();
+        const bool now = ui.on_off(L"Real-time combat in Sandbox mode", was);
+        if (now != was) set_enabled(now);
+        ui.field(L"Locked on to", rtc::lockon::locked() ? rtc::lockon::state().model : std::wstring(L"nothing"));
+        ui.field(L"Lock on", rtc::input::keys_of(rtc::input::Action::Lock));
+        ui.field(L"Next target", std::format(L"{} (right), {} (left)", rtc::input::keys_of(rtc::input::Action::NextRight),
+                                             rtc::input::keys_of(rtc::input::Action::NextLeft)));
     }
 } // namespace
 
@@ -84,22 +117,16 @@ class RealtimeCombat : public wcmods::ModBase
     auto on_unreal_init() -> void override
     {
         wcmods::log(L"loaded ({})", enabled() ? L"enabled" : L"switched off in its settings");
+        rtc::input::load();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
+        rtc::lockon::share();
         wcmods::every(0.25, update_gate);
+        wcmods::every_frame(frame);
 
-        // The page below has the one setting there is so far.
+        // The page below has the settings there are so far.
         wcmods::settings_page(false);
-        wcmods::menu_page(L"Real-time combat", [](wcmods::Ui& ui) {
-            ui.heading(L"Real-time combat");
-            ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                    L"Work in progress: so far the animals leave your cat alone while it's on.");
-            const Gate& g = gate();
-            ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
-            const bool was = enabled();
-            const bool now = ui.on_off(L"Real-time combat in Sandbox mode", was);
-            if (now != was) set_enabled(now);
-        });
+        wcmods::menu_page(L"Real-time combat", page);
     }
 };
 

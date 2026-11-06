@@ -1,0 +1,104 @@
+// input.hpp: the player's actions, from the keys in settings.json's "keys" (Unreal's key names, read through the game's
+// own input, so the mouse's buttons and wheel and a controller's buttons work too), and from tests: a test shares
+// "RealtimeCombat.action" from Lua (WCModsCpp.share("RealtimeCombat.action", "lock 3")), and each new value is the
+// action before the space, done once.
+#pragma once
+
+#include <WCMods/WCMods.hpp>
+
+#include <array>
+#include <mutex>
+#include <string>
+#include <vector>
+
+namespace rtc::input
+{
+    enum class Action
+    {
+        Lock,
+        NextRight,
+        NextLeft,
+        Count,
+    };
+
+    struct Binding
+    {
+        Action action;
+        const char* setting;                    // its name in settings.json's "keys"
+        const char* word;                       // its name from tests
+        std::vector<std::wstring> defaults;     // the keys it's on unless the settings say
+    };
+
+    inline auto bindings() -> const std::vector<Binding>&
+    {
+        static const std::vector<Binding> all{
+            {Action::Lock, "lock", "lock", {L"Tab", L"MiddleMouseButton"}},
+            {Action::NextRight, "next_right", "next_right", {L"MouseScrollUp"}},
+            {Action::NextLeft, "next_left", "next_left", {L"MouseScrollDown"}},
+        };
+        return all;
+    }
+
+    struct State
+    {
+        std::array<std::vector<std::wstring>, static_cast<size_t>(Action::Count)> keys;
+        std::string last_test;
+    };
+    inline auto state() -> State&
+    {
+        static State s;
+        return s;
+    }
+
+    // The keys each action is on: settings.json's "keys" (a key's name, or a list of them), else the defaults.
+    inline auto load() -> void
+    {
+        State& s = state();
+        std::lock_guard lock(wcmods::settings_lock());
+        const wcmods::Json& keys = wcmods::settings()["keys"];
+        for (const Binding& b : bindings())
+        {
+            auto& out = s.keys[static_cast<size_t>(b.action)];
+            out.clear();
+            const wcmods::Json& v = keys[b.setting];
+            if (v.is_string()) out.push_back(v.wstring());
+            else if (v.is_array())
+                for (const wcmods::Json& k : v.values())
+                    if (k.is_string() && !k.wstring().empty()) out.push_back(k.wstring());
+            if (out.empty() && !v.is_array()) out = b.defaults;   // [] is "on no key"
+        }
+    }
+
+    // What the player asked for this frame.
+    struct Pressed
+    {
+        std::array<bool, static_cast<size_t>(Action::Count)> on{};
+        auto operator[](Action a) const -> bool { return on[static_cast<size_t>(a)]; }
+    };
+
+    inline auto poll() -> Pressed
+    {
+        State& s = state();
+        Pressed p;
+        for (const Binding& b : bindings())
+            for (const std::wstring& key : s.keys[static_cast<size_t>(b.action)])
+                if (wcmods::pressed(key)) p.on[static_cast<size_t>(b.action)] = true;
+        const std::string test = wcmods::shared("RealtimeCombat.action").string();
+        if (!test.empty() && test != s.last_test)
+        {
+            s.last_test = test;
+            const std::string word = test.substr(0, test.find(' '));
+            for (const Binding& b : bindings())
+                if (word == b.word) p.on[static_cast<size_t>(b.action)] = true;
+        }
+        return p;
+    }
+
+    // The keys an action is on, for the mod menu: "Tab, MiddleMouseButton".
+    inline auto keys_of(Action a) -> std::wstring
+    {
+        std::wstring out;
+        for (const std::wstring& k : state().keys[static_cast<size_t>(a)]) out += (out.empty() ? L"" : L", ") + k;
+        return out.empty() ? L"(none)" : out;
+    }
+} // namespace rtc::input
