@@ -27,7 +27,11 @@ play a Sandbox mode cat:
   your cat sleeps, goes back to camp or comes into the forest. A hit while drinking stops it;
 - **hold the right mouse button** to block (step 7): a hit from in front does a quarter, the rest off stamina, and
   with no stamina the guard breaks. Block just before a hit lands to **parry** it: no damage, and the animal reels,
-  open to a riposte that does three times the damage. (The animations are stand-ins from your cat's fight moves.)
+  open to a riposte that does three times the damage. (The animations are stand-ins from your cat's fight moves.);
+- **on the HUD** (step 8): a health bar over each animal you've hit, a bigger one with its name and level over the
+  one you're locked on to, and your cat's stamina and flask under its health bar;
+- **falling**: at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed, its
+  flask full.
 
 The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
 and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's
