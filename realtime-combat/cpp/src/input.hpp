@@ -41,15 +41,19 @@ namespace rtc::input
     inline auto bindings() -> const std::vector<Binding>&
     {
         static const std::vector<Binding> all{
-            {Action::Lock, "lock", "lock", {L"Tab", L"MiddleMouseButton"}},
-            {Action::NextRight, "next_right", "next_right", {L"MouseScrollUp"}},
-            {Action::NextLeft, "next_left", "next_left", {L"MouseScrollDown"}},
-            {Action::Light, "light_attack", "light", {L"F"}},
-            {Action::Heavy, "heavy_attack", "heavy", {L"G"}},
+            // a controller's, beside the keyboard's: the buttons the game leaves free in play where there are any (the
+            // right stick's click, the right trigger, the d-pad's up, left and right); the heavy attack, the block and
+            // the dodge share the game's crouch (LT), camera reset (LB) and drop / talk to a friend (B), as the block
+            // shares the right mouse button's crouch
+            {Action::Lock, "lock", "lock", {L"Tab", L"MiddleMouseButton", L"Gamepad_RightThumbstick"}},
+            {Action::NextRight, "next_right", "next_right", {L"MouseScrollUp", L"Gamepad_DPad_Right"}},
+            {Action::NextLeft, "next_left", "next_left", {L"MouseScrollDown", L"Gamepad_DPad_Left"}},
+            {Action::Light, "light_attack", "light", {L"F", L"Gamepad_RightTrigger"}},
+            {Action::Heavy, "heavy_attack", "heavy", {L"G", L"Gamepad_LeftTrigger"}},
             {Action::Lunge, "lunge", "lunge", {}},   // the light attack while running; a key of its own if the settings give one
-            {Action::Dodge, "dodge", "dodge", {L"LeftAlt"}},
-            {Action::Drink, "drink", "drink", {L"Z"}},
-            {Action::Block, "block", "block", {L"RightMouseButton"}},   // held (held(), below)
+            {Action::Dodge, "dodge", "dodge", {L"LeftAlt", L"Gamepad_FaceButton_Right"}},
+            {Action::Drink, "drink", "drink", {L"Z", L"Gamepad_DPad_Up"}},
+            {Action::Block, "block", "block", {L"RightMouseButton", L"Gamepad_LeftShoulder"}},   // held (held(), below)
             {Action::Hurt, nullptr, "hurt", {}},   // tests only: no key can be put on it
         };
         return all;

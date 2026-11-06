@@ -52,6 +52,21 @@ namespace rtc::flask
         wcmods::share("flask_max", state().max);
     }
 
+    // The settings read again (the mod menu changed them): the drinks left kept, within the new most.
+    inline auto reload() -> void
+    {
+        State& s = state();
+        {
+            std::lock_guard lock(wcmods::settings_lock());
+            const double n = wcmods::settings()["flask_charges"].number(3);
+            s.max = n >= 0 && n <= 20 ? static_cast<int>(n) : 3;
+            const double h = wcmods::settings()["flask_heal"].number(0.4);
+            s.heal = h > 0 && h <= 1 ? h : 0.4;
+        }
+        s.charges = std::min(s.charges, s.max);
+        share();
+    }
+
     inline auto load() -> void
     {
         State& s = state();

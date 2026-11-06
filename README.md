@@ -1,41 +1,65 @@
 # Real-time combat for Sandbox mode
 
 A mod for *Warrior Cats: Clans of the Forest* that swaps the game's turn-based fights for real-time ones
-while you play a [Sandbox mode](https://github.com/HexOffender/wcmods-sandbox) cat: lock on to an
-animal, attack it, dodge what it throws at you, and heal from a flask, out in the forest with no fight
-screen. Story cats keep the game's own fights.
+while you play a [Sandbox mode](https://github.com/HexOffender/wcmods-sandbox) cat. You lock on to an
+animal and circle it, attack it, dodge, block and parry, and heal from a flask, all out in the forest with
+no fight screen. Story cats keep the game's own fights.
 
 It's a C++ mod made with [wcmods](https://github.com/HexOffender/warrior-cats-mods) and its C++ SDK.
+[docs/plan.md](docs/plan.md) has how it was built, step by step, and what was found in the game along the way.
 
-**Work in progress.** [docs/plan.md](docs/plan.md) has the plan and what each step adds. So far, while you
-play a Sandbox mode cat:
-- the animals leave your cat alone, so no turn-based fight starts (step 1);
-- **Tab** (or the middle mouse button) locks on to the animal nearest the middle of the view, within 15 m:
-  the camera turns to it and follows it, and a marker sits on it. The mouse wheel moves to the next one to the
-  right or left; Tab again lets go. Locked on, **A** and **D** walk your cat forward in a circle round the
-  target (a cat can't walk sideways); W and S walk in and out (step 2);
-- **F** is a light attack and **G** a heavy one; F while running (Shift) is a lunge. They cost stamina, and
-  hit the animals in front of your cat; an animal's health is the mod's own, and at none left it falls and
-  is gone (step 3);
-- **Left Alt** dodges about 3 m the way you're moving (standing still: back); nothing hurts your cat for its
-  first moment. It costs stamina, and can cut an attack short once the attack has landed (step 4).
-- walking into an animal no longer starts the game's fight either: its body blocks your cat;
-- **the animals fight back** (step 5): one within 4 m, or one you hit, comes after your cat and attacks with its
-  own animations, one at a time, each with a wind-up you can see coming: dodge it, or hit the animal in its wind-up
-  to make it reel. Beaten prey goes on your Clan's fresh-kill pile. Run far enough and it gives up;
-- **Z** drinks from the flask (step 6): 40% of your cat's health back over a second, three drinks, full again when
-  your cat sleeps, goes back to camp or comes into the forest. A hit while drinking stops it;
-- **hold the right mouse button** to block (step 7): a hit from in front does a quarter, the rest off stamina, and
-  with no stamina the guard breaks. Block just before a hit lands to **parry** it: no damage, and the animal reels,
-  open to a riposte that does three times the damage. (The animations are stand-ins from your cat's fight moves.);
-- **on the HUD** (step 8): a health bar over each animal you've hit, a bigger one with its name and level over the
-  one you're locked on to, and your cat's stamina and flask under its health bar;
-- **falling**: at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed, its
-  flask full.
+## How to play
 
-The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
-and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's
-added), read as the game starts: restart the game after changing them.
+While you play a Sandbox mode cat, the animals no longer start the game's turn-based fights, whether they
+notice your cat, it pounces on one, or walks into one. Instead:
+
+| | Keyboard and mouse | Controller |
+|---|---|---|
+| **Lock on** to the animal nearest the middle of the view (15 m); again to let go | Tab, or the middle mouse button | Right stick, clicked |
+| **Next target** to the right or left | Mouse wheel up or down | D-pad right or left |
+| **Circle** round the target, locked on (a cat walks forward round it: it can't walk sideways) | A or D | Left stick, left or right |
+| **Light attack** (while running: a lunge forward) | F | RT |
+| **Heavy attack** | G | LT |
+| **Dodge** the way you're moving (standing still: back) | Left Alt | B |
+| **Block**, held; raised just before a hit lands: **parry** | Right mouse button | LB |
+| **Drink** from the flask | Z | D-pad up |
+
+- **Stamina** is the game's own. Attacks, dodges and blocked hits spend it, and none comes back while you
+  act or for a moment after. An action needs at least half its cost. It shows as a gold bar under your cat's
+  health bar.
+- **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge.
+- **Attacking:** a hit lands on every animal in front of your cat that it can see. A light attack pressed
+  as one lands follows it.
+- **The animals fight back.** One within 4 m, or one you hit, comes after your cat and attacks with its own
+  animations. They attack one at a time, each with a wind-up you can see coming. Hit one in its wind-up and
+  it reels. Its health is the mod's own, and a bar shows over it once you've hit it. The one you're locked on
+  to gets a bigger bar with its name and level. Lead one 20 m from where it joined and it goes back to
+  roaming.
+- **Blocking:** a hit from in front does a quarter of its damage, and the rest comes off stamina. With too
+  little stamina, the guard breaks. A **parry** takes nothing, and leaves the animal reeling and open to a
+  **riposte**: your next hit on it does three times the damage.
+- **The flask** has three drinks, each giving back 40% of your cat's health over a second. A hit while
+  drinking stops it. It fills again when your cat sleeps, goes back to camp, or comes into the forest.
+- **Beaten prey** goes on your Clan's fresh-kill pile.
+- **Falling:** at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed,
+  its flask full.
+
+The animations come from the game's own fights, cut to their strikes. The guard, the parry and the drink are
+stand-ins from your cat's own moves (Stone Guard, Hissing Parry, sniffing) until they're animated properly.
+
+**Settings:** the mod menu (Insert) has a Real-time combat page:
+- whether it's on;
+- your cat's damage, the animals' health and damage;
+- whether the animals fight back and from how near;
+- the flask;
+- how far lock-on reaches.
+
+Each change applies at once. The keys and buttons are in the mod's `settings.json`, by Unreal's key names;
+restart the game after changing them.
+
+**Two of the controller's buttons are shared with the game:** LT crouches, and B drops what your cat carries
+(or talks to a friend near). The right mouse button crouches too. While blocking, the guard pose covers the
+crouch.
 
 ## What it needs
 
@@ -44,33 +68,30 @@ added), read as the game starts: restart the game after changing them.
 - [Sandbox mode](https://github.com/HexOffender/wcmods-sandbox) 0.7 or later: it tells C++ mods which cat
   is a sandbox cat. Without it the mod stays off.
 
+## Getting it
+
+- **From a release:** download `realtime-combat-<version>.zip` from the Releases page and add it with Clan
+  Mod Studio's Mods page, or `python wcmods.py add realtime-combat-<version>.zip`. Then Apply to game (or
+  `python wcmods.py install`) with the game closed. The zip has the built DLL, so there's nothing to build.
+- **From this repository:** build it (below), then `python wcmods.py add <this repository>\realtime-combat`.
+
 ## Building it
 
 A C++ mod is built against UE4SS's own source, at the version the game has. wcmods gets and builds that
-once (wcmods' `docs/SDK.md`, "C++ mods", says what it needs: Visual Studio with "Desktop development
-with C++", Rust and git):
+once. wcmods' `docs/SDK.md`, "C++ mods", says what it needs: Visual Studio with "Desktop development with
+C++", Rust and git. In the wcmods folder:
 
 ```
 python wcmods.py cpp setup
 python wcmods.py cpp build <this repository>\realtime-combat
 ```
 
-in the wcmods folder. That makes `realtime-combat\dlls\main.dll`. Or open
-`realtime-combat\realtime-combat.sln` in Visual Studio: run `python tools\sync_ue4ss_props.py` in
-`realtime-combat\` first (it writes `UE4SS.props` from wcmods' build), then build Release. The solution
-finds wcmods beside this repository (`D:\projects\warrior-cats-mods` next to
-`D:\projects\wcmods-realtime-combat`), or where `realtime-combat\wcmods.props` says.
+That makes `realtime-combat\dlls\main.dll`.
 
-## Putting it in the game
-
-With the game closed, in the wcmods folder:
-
-```
-python wcmods.py add <this repository>\realtime-combat
-python wcmods.py install
-```
-
-(or Apply to game in Clan Mod Studio).
+Or open `realtime-combat\realtime-combat.sln` in Visual Studio: run `python tools\sync_ue4ss_props.py` in
+`realtime-combat\` first (it writes `UE4SS.props` from wcmods' build), then build Release. The solution finds
+wcmods beside this repository (`D:\projects\warrior-cats-mods` next to `D:\projects\wcmods-realtime-combat`),
+or where `realtime-combat\wcmods.props` says.
 
 ## Tests
 
@@ -85,6 +106,14 @@ python wcmods.py install
   python wcmods.py agent test <this repository>\tests\game --launch
   ```
 
-  They change what Sandbox mode says about the cat in play, from the agent's script bridge, and put it back
-  after each test. Sandbox mode clears a sandbox cat's story quests as it comes into the forest; the run
-  backs the save up first (`python wcmods.py restore <name>`, printed as the run starts), to put them back.
+  They put rabbits out, held still, at places they choose, and drive the mod through shared values as well as
+  its real keys. They change what Sandbox mode says about the cat in play, and put it back after each test.
+  Sandbox mode clears a sandbox cat's story quests as it comes into the forest. The run backs the save up
+  first (`python wcmods.py restore <name>`, printed as the run starts), so you can put them back.
+
+## Releasing
+
+1. Raise `"version"` in `realtime-combat/mod.json`, and build.
+2. `python tools/pack.py` makes `dist/realtime-combat-<version>.zip`. It stops if the DLL is older than the
+   source.
+3. Make a GitHub release tagged `v<version>` with the zip attached. Sandbox mode 0.7 has to be released first.

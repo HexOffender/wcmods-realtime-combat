@@ -89,7 +89,7 @@ buttons and shoulders are taken).
 | 6. The flask | done: #7 |
 | 7. Blocking and parrying | done: #8 |
 | 8. The HUD, and falling | done: #9 |
-| 9. The controller, settings, and the release | |
+| 9. The controller, settings, and the release | done: #10 (the release itself waits for a yes) |
 
 ### 1. The mod, and the Sandbox gate
 
@@ -221,6 +221,11 @@ buttons and shoulders are taken).
 
 - Controller buttons (after checking which the game leaves free in play), the settings page finished
   (keys, damage, health and stamina multipliers, flask charges, lock-on reach), README with how to play.
+- **Built:** the controller's free buttons in play are the right stick's click, RT and the d-pad's up, left and
+  right (its down is the emote wheel's), so the heavy attack, the block and the dodge share LT (crouch), LB
+  (camera reset) and B (drop, talk to a friend). The page's sliders and switches apply at once; the keys stay in
+  settings.json, read as the game starts. The controller's buttons can't be pressed from the tests (the agent
+  posts window messages; a controller's buttons come through XInput), so they're untried in game.
 - An end-to-end run in a sandbox cat, with the real Sandbox mode mod.
 - `tools/pack.py` makes the release's zip. The GitHub release itself waits for a yes.
 
