@@ -24,6 +24,8 @@ namespace rtc::input
         Heavy,
         Lunge,
         Dodge,
+        Drink,
+        Hurt,   // tests only: your cat takes a small hit, as an animal's would
         Count,
     };
 
@@ -45,6 +47,8 @@ namespace rtc::input
             {Action::Heavy, "heavy_attack", "heavy", {L"G"}},
             {Action::Lunge, "lunge", "lunge", {}},   // the light attack while running; a key of its own if the settings give one
             {Action::Dodge, "dodge", "dodge", {L"LeftAlt"}},
+            {Action::Drink, "drink", "drink", {L"Z"}},
+            {Action::Hurt, nullptr, "hurt", {}},   // tests only: no key can be put on it
         };
         return all;
     }
@@ -70,6 +74,7 @@ namespace rtc::input
         {
             auto& out = s.keys[static_cast<size_t>(b.action)];
             out.clear();
+            if (!b.setting) continue;
             const wcmods::Json& v = keys[b.setting];
             if (v.is_string()) out.push_back(v.wstring());
             else if (v.is_array())
@@ -93,7 +98,7 @@ namespace rtc::input
         Pressed p;
         for (const Binding& b : bindings())
             for (const std::wstring& key : s.keys[static_cast<size_t>(b.action)])
-                if (wcmods::pressed(key)) p.on[static_cast<size_t>(b.action)] = true;
+                if (wcmods::pressed(key)) p.on[static_cast<size_t>(b.action)] = true;   // (none for the tests' own)
         const std::string test = wcmods::shared("RealtimeCombat.action").string();
         if (!test.empty() && test != s.last_test)
         {

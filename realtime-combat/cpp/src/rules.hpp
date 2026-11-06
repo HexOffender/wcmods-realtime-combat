@@ -561,4 +561,29 @@ namespace rtc
     }
     // Whether it holds the turn to attack (only one animal attacks at a time; the others wait close).
     inline auto attacking(const Foe& f) -> bool { return f.state == FoeState::WindUp || f.state == FoeState::Recover; }
+
+    // ------------------------------------------------------------------------------------------- the flask
+    // A drink: the game has no drinking animation, so its sniff (head down, as if lapping) stands in, played from `from`
+    // to `to` at `rate`; health comes back over `heal_from` to `heal_to` (real seconds from the press), `heal` of the
+    // most your cat can have in all. A hit while drinking stops it, the charge spent.
+    struct FlaskSpec
+    {
+        std::wstring_view tag = L"Animation.Exploration.Interaction.Sniff";
+        double from = 0.4, to = 2.0, rate = 1.4;
+        double heal_from = 0.45, heal_to = 1.05;
+        double heal = 0.4;
+        int charges = 3;
+    };
+    inline auto duration(const FlaskSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    // How much comes back between `before` and `after` seconds into a drink: the part of the healing time inside them.
+    inline auto healed_between(const FlaskSpec& s, double max_health, double before, double after) -> double
+    {
+        const double a = std::max(before, s.heal_from), b = std::min(after, s.heal_to);
+        if (b <= a || s.heal_to <= s.heal_from) return 0;
+        return max_health * s.heal * (b - a) / (s.heal_to - s.heal_from);
+    }
+    // The flask fills again when your cat rests: comes into the forest, sleeps, or goes back to camp (the game's
+    // Return to Camp, or any travel, moves it farther in a frame than any running could: `jump` cm).
+    constexpr double travel_jump = 3000;
+    inline auto travelled(Vec before, Vec after) -> bool { return flat_distance(before, after) > travel_jump; }
 } // namespace rtc

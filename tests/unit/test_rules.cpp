@@ -358,8 +358,28 @@ static void circling_keeps_to_the_circle()
 
 }
 
+static void the_flask()
+{
+    const rtc::FlaskSpec f;
+    CHECK(rtc::duration(f) > 0.8 && rtc::duration(f) < 1.6);
+    CHECK(f.heal_from < f.heal_to && f.heal_to <= rtc::duration(f));
+    // all of it over the healing time, none before or after, a part for part of it
+    CHECK(near(rtc::healed_between(f, 178, 0, rtc::duration(f)), 178 * 0.4));
+    CHECK(near(rtc::healed_between(f, 178, 0, f.heal_from), 0));
+    CHECK(near(rtc::healed_between(f, 178, f.heal_to, 5), 0));
+    const double mid = (f.heal_from + f.heal_to) / 2;
+    CHECK(near(rtc::healed_between(f, 178, f.heal_from, mid), 178 * 0.2));
+    // frame by frame adds up to the whole
+    double sum = 0;
+    for (double t = 0; t < rtc::duration(f); t += 1.0 / 60) sum += rtc::healed_between(f, 100, t, t + 1.0 / 60);
+    CHECK(near(sum, 40, 0.01));
+    // travelling: a jump no running makes
+    CHECK(rtc::travelled({0, 0, 0}, {4000, 0, 0}) && !rtc::travelled({0, 0, 0}, {50, 0, 0}));
+}
+
 int main()
 {
+    the_flask();
     circling_keeps_to_the_circle();
     foes_hit_back();
     the_dodge();

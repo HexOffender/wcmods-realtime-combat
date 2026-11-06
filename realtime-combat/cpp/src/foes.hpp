@@ -22,6 +22,7 @@
 #include "attacks.hpp"
 #include "dodge.hpp"
 #include "enemies.hpp"
+#include "flask.hpp"
 #include "game.hpp"
 #include "rules.hpp"
 
@@ -114,6 +115,7 @@ namespace rtc::foes
         *health.value = static_cast<float>(std::max(1.0, *health.value - damage));
         attacks::end();
         dodge::end();   // (past its safe moment: the hit cuts the hop short)
+        flask::end();   // a drink stops, the charge spent
         s.hurt_montage = wcmods::play_montage(me, L"Animation.Combat.Hit.1.Neutral", 1.2);
         s.hurt_left = 0.45;
         wcmods::share("cat_hits", ++s.cat_hits);

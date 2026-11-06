@@ -8,8 +8,8 @@
 // bodies block your cat with their encounter capsules off (bodies.hpp), so walking into one starts none either.
 //
 // Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp and the
-// stamina in stamina.hpp. The dodge (step 4): dodge.hpp. The animals fighting back (step 5): foes.hpp. Each runs
-// every frame while it's on.
+// stamina in stamina.hpp. The dodge (step 4): dodge.hpp. The animals fighting back (step 5): foes.hpp. The flask
+// (step 6): flask.hpp. Each runs every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -24,6 +24,7 @@
 #include "bodies.hpp"
 #include "dodge.hpp"
 #include "enemies.hpp"
+#include "flask.hpp"
 #include "foes.hpp"
 #include "game.hpp"
 #include "input.hpp"
@@ -87,6 +88,9 @@ namespace
             if (on)
             {
                 rtc::bodies::frame(1.0);   // the animals near set at once
+                // coming into the forest (not the mod's switch turned back on, nor one of the game's fights ending)
+                if (g.off == rtc::Off::NotInWorld || g.off == rtc::Off::NotSandbox || g.off == rtc::Off::NoSandbox)
+                    rtc::flask::refill(L"came into the forest");
                 wcmods::log(L"on: real-time combat, the animals ignore your cat");
             }
             else
@@ -94,6 +98,7 @@ namespace
                 rtc::lockon::release("off");
                 rtc::attacks::end();
                 rtc::dodge::end();
+                rtc::flask::end();
                 rtc::foes::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
@@ -114,11 +119,16 @@ namespace
         rtc::bodies::frame(dt);
         rtc::input::Pressed pressed = rtc::input::poll();
         rtc::lockon::frame(dt, pressed);
+        if (rtc::flask::busy())   // no dodge or attack starts mid-drink
+            for (auto a : {rtc::input::Action::Dodge, rtc::input::Action::Light, rtc::input::Action::Heavy, rtc::input::Action::Lunge})
+                pressed.on[static_cast<size_t>(a)] = false;
         rtc::dodge::frame(dt, pressed);
         if (rtc::dodge::busy())   // no attack starts mid-dodge
             for (auto a : {rtc::input::Action::Light, rtc::input::Action::Heavy, rtc::input::Action::Lunge})
                 pressed.on[static_cast<size_t>(a)] = false;
         rtc::attacks::frame(dt, pressed);
+        rtc::flask::frame(dt, pressed, !rtc::attacks::busy() && !rtc::dodge::busy());
+        if (pressed[rtc::input::Action::Hurt]) rtc::foes::hurt_cat(5);
         rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy());
         // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
         if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
@@ -130,7 +140,7 @@ namespace
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: lock on, attack and dodge; the animals fight back. Falling and healing come next.");
+                L"Work in progress: lock on, attack, dodge and drink from the flask; the animals fight back.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -143,6 +153,9 @@ namespace
         ui.field(L"Light attack", rtc::input::keys_of(rtc::input::Action::Light) + L" (while running: a lunge)");
         ui.field(L"Heavy attack", rtc::input::keys_of(rtc::input::Action::Heavy));
         ui.field(L"Dodge", rtc::input::keys_of(rtc::input::Action::Dodge) + L" (the way you're moving; standing still, back)");
+        ui.field(L"Drink from the flask", std::format(L"{} ({} of {} left; full again at camp, asleep, or coming into the forest)",
+                                                     rtc::input::keys_of(rtc::input::Action::Drink), rtc::flask::state().charges,
+                                                     rtc::flask::state().max));
         if (auto stamina = wcmods::cat().stamina()) ui.progress(L"Stamina", *stamina.value / std::max(1.0f, *stamina.max));
     }
 } // namespace
@@ -158,6 +171,7 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::attacks::load();
         rtc::enemies::load();
         rtc::foes::load();
+        rtc::flask::load();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();
