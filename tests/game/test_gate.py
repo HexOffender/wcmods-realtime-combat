@@ -48,8 +48,19 @@ def _sandbox(agent, ready):
 def _sandbox_says(agent):
     """What Sandbox mode itself shares (UE4SS's shared variable): whether the cat in play is a sandbox cat, being
     played; None without Sandbox mode."""
-    return agent.lua('return ModRef:GetSharedVariable("Sandbox.version") ~= nil and '
-                     'ModRef:GetSharedVariable("Sandbox.ready") == true or nil')
+    got = agent.lua('return { installed = ModRef:GetSharedVariable("Sandbox.version") ~= nil, '
+                    'ready = ModRef:GetSharedVariable("Sandbox.ready") == true }')
+    return got["ready"] if got.get("installed") else None
+
+
+def _sandbox_settled(agent):
+    """Wait (up to 20 s) until Sandbox mode is done deciding about the cat in play: a sandbox cat coming into the
+    forest is "active" a few seconds before it's "ready" (its opening scenes, the quests cleared)."""
+    end = time.time() + 20
+    while time.time() < end and agent.lua('return ModRef:GetSharedVariable("Sandbox.active") == true and '
+                                          'ModRef:GetSharedVariable("Sandbox.ready") ~= true'):
+        time.sleep(0.5)
+    time.sleep(0.5)   # the mod looks four times a second
 
 
 def _until(agent, cond, timeout, what):
@@ -66,10 +77,12 @@ def _until_state(agent, state, timeout=5):
 
 
 def _ignoring(agent):
-    """Each roaming animal within 4,000 units: whether it ignores your cat."""
+    """Each roaming animal within 4,000 units, by its address: whether it ignores your cat."""
     return agent.lua("""local out = {}
-        for _, n in ipairs(Game.animals.near(4000)) do out[#out + 1] = Game.ai.ignoringPlayer(n.actor) end
-        return out""")
+        for _, n in ipairs(Game.animals.near(4000)) do
+            out[string.format("%x", n.actor:GetAddress())] = Game.ai.ignoringPlayer(n.actor)
+        end
+        return out""") or {}
 
 
 def _leave_fight(agent):
@@ -123,6 +136,7 @@ def teardown(agent):
 def test_sandbox_mode_reaches_cpp(agent):
     """Sandbox mode 0.7 hands its state to C++ mods: the mod is on for a sandbox cat and off for a story cat, as
     Sandbox mode itself says ("no-sandbox" would mean it never heard from it)."""
+    _sandbox_settled(agent)
     says = _sandbox_says(agent)
     assert says is not None, "Sandbox mode (0.7 or later) isn't installed"
     s = _state(agent)
@@ -144,8 +158,11 @@ def test_on_for_a_sandbox_cat(agent):
     _sandbox(agent, False)
     _until_state(agent, "not-sandbox")
     assert _state(agent)["on"] is False
+    # the animals still near (they roam, so some may have come or gone): each as it was before
     after = _ignoring(agent)
-    assert after == before, f"the animals near don't notice your cat as before: {before} then {after}"
+    changed = {a: (before[a], after[a]) for a in before.keys() & after.keys() if before[a] != after[a]}
+    assert before.keys() & after.keys(), "no animal stayed near to compare"
+    assert not changed, f"these animals don't notice your cat as before (before, after): {changed}"
 
 
 def test_no_fight_while_on(agent):
@@ -167,8 +184,10 @@ def test_switched_off_in_its_settings(agent):
     _sandbox(agent, True)
     _until_state(agent, "on")
     agent.menu.open()
+    opened = False
     try:
         agent.menu.open("Real-time combat")
+        opened = True
         page = agent.menu.read()
         assert page.get("Now") == "On", page.text()
         agent.menu.set("Real-time combat in Sandbox mode", False)
@@ -178,5 +197,6 @@ def test_switched_off_in_its_settings(agent):
         agent.menu.set("Real-time combat in Sandbox mode", True)
         _until_state(agent, "on")
     finally:
-        agent.menu.set("Real-time combat in Sandbox mode", True)
+        if opened:
+            agent.menu.set("Real-time combat in Sandbox mode", True)
         agent.menu.close()

@@ -24,17 +24,19 @@ namespace rtc
         Disabled,
         NoSandbox,
         NotSandbox,
-        NotInWorld,
         InFight,
+        NotInWorld,
     };
 
+    // A fight is looked at before the world: in one, the game's player() is the fight's pawn's (no cat in the world),
+    // so "not in the world" would hide it.
     constexpr auto gate(const GateInput& in) -> Off
     {
         if (!in.enabled) return Off::Disabled;
         if (!in.sandbox_installed) return Off::NoSandbox;
         if (!in.sandbox_ready) return Off::NotSandbox;
-        if (!in.in_world) return Off::NotInWorld;
         if (in.in_fight) return Off::InFight;
+        if (!in.in_world) return Off::NotInWorld;
         return Off::None;
     }
 

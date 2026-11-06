@@ -57,6 +57,10 @@ static void gate_says_the_first_reason()
     CHECK(rtc::gate(none) == rtc::Off::NoSandbox);
     none.sandbox_installed = true;
     CHECK(rtc::gate(none) == rtc::Off::NotSandbox);
+
+    // In a fight the game has no cat in the world (player() is the fight's): the fight is what's said.
+    rtc::GateInput fight{.enabled = true, .sandbox_installed = true, .sandbox_ready = true, .in_world = false, .in_fight = true};
+    CHECK(rtc::gate(fight) == rtc::Off::InFight);
 }
 
 static void every_state_has_words_and_a_code()

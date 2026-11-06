@@ -12,17 +12,26 @@
 #include <WCMods/WCMods.hpp>
 
 #include <format>
+#include <mutex>
 #include <string>
 
 #include "rules.hpp"
 
 namespace
 {
-    auto enabled() -> bool { return wcmods::settings()["enabled"].boolean(true); }
+    // Under the SDK's settings lock: reloading them replaces the whole object.
+    auto enabled() -> bool
+    {
+        std::lock_guard lock(wcmods::settings_lock());
+        return wcmods::settings()["enabled"].boolean(true);
+    }
 
     auto set_enabled(bool on) -> void
     {
-        wcmods::settings().set("enabled", on);
+        {
+            std::lock_guard lock(wcmods::settings_lock());
+            wcmods::settings().set("enabled", on);
+        }
         if (!wcmods::save_settings()) wcmods::log(L"couldn't write settings.json");
     }
 

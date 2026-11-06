@@ -15,8 +15,8 @@ update rebuilt it. It needs `cpp build` to have run once, for any mod (the C++ S
 `python wcmods.py cpp build tests/cpp-sdk`).
 
 Without a folder, wcmods is looked for two folders up (this mod sitting in wcmods' mods/), then as a
-warrior-cats-mods folder beside this one, then as one beside the folder this one is in (this template in a
-wcmods-examples checkout, next to a warrior-cats-mods checkout), the way wcmods.props guesses.
+warrior-cats-mods folder beside this one, then as one beside the folder this one is in (this mod in a
+wcmods-realtime-combat checkout, next to a warrior-cats-mods checkout), the way wcmods.props guesses.
 """
 import datetime
 import os
