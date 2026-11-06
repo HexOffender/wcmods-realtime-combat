@@ -146,6 +146,17 @@ namespace rtc::game
         return {std::clamp(forward, -1.0, 1.0), std::clamp(right, -1.0, 1.0)};
     }
 
+    // Which way an actor's moving along the ground (its velocity's yaw), or nullopt when it's (nearly) still.
+    inline auto moving_yaw(UObject* actor) -> std::optional<double>
+    {
+        auto r = wcmods::call_reflected(actor, STR("GetVelocity"));
+        if (!r) return std::nullopt;
+        wcmods::Value v = r->get(L"ReturnValue");
+        const double x = wcmods::get(v, L"X").number(), y = wcmods::get(v, L"Y").number();
+        if (std::hypot(x, y) < 100) return std::nullopt;
+        return std::atan2(y, x) * degrees_per_radian;
+    }
+
     // Set which way an actor faces (only it, not its controller).
     inline auto set_facing(UObject* actor, double yaw) -> bool
     {
@@ -217,13 +228,19 @@ namespace rtc::game
                    }).has_value();
         };
         // swept across a little above the higher of here and there (so a bump in the ground doesn't stop it); stopped
-        // short, the rest tried again 30 cm up, as the game's movement steps over a stone or a tuft (an animal or a
-        // wall is taller); then set down on the ground where it got to
+        // short, the rest tried again 30 cm up, as the game's movement steps over a stone or a tuft (a wall is taller;
+        // and not when an animal's what stopped it: a rabbit's low enough to be stepped over, seen in game); then set
+        // down on the ground where it got to
         const double across = std::max(now->z, *ground_there + height) + 8;
         if (!put({now->x + dx * step, now->y + dy * step, across}, true)) return false;
         auto after = at(actor);
         if (!after) return false;
-        if (flat_distance(*now, *after) < step * 0.7)
+        auto animal_ahead = [&] {
+            for (const wcmods::Animal& a : wcmods::animals(300))
+                if (auto where = at(a.actor); where && a.actor != actor && flat_distance(*after, *where) < 90) return true;
+            return false;
+        };
+        if (flat_distance(*now, *after) < step * 0.7 && !animal_ahead())
         {
             const double left = step - flat_distance(*now, *after);
             if (put({after->x, after->y, across + 30}, true))
@@ -234,7 +251,7 @@ namespace rtc::game
                     if (!after) return false;
                 }
         }
-        if (auto g = wcmods::ground(after->x, after->y, after->z + 50)) put({after->x, after->y, *g + height}, false);
+        if (auto g = wcmods::ground(after->x, after->y, after->z + 50)) put({after->x, after->y, *g + height}, true);
         return flat_distance(*now, *after) > 0.5;
     }
 

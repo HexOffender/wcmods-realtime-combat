@@ -35,7 +35,8 @@ the next.
   noticed or not. `wcmods::ignore_player_everywhere(true)` stops the first two (six pounces on animals
   ignoring your cat started no fight; the first pounce with them noticing it did). For the third, while
   the mod is on, each animal near has its encounter capsule ignoring cats and its body blocking them
-  (`bodies.hpp`, from step 4: a dodge slid your cat into a rabbit and a fight started).
+  (`bodies.hpp`, from step 4: a dodge slid your cat into a rabbit and a fight started). Its body only blocks
+  while it's in a fight with your cat (locked on to, or hit), so a Clan's patrols still pass through the rest.
 - **Keys:** most letters are already the game's. The left mouse button is Interact (it travels at a den
   entrance), the right one crouches, R resets the camera, Q tracks scents, SpaceBar pounces. Free: F, G,
   H, Z, B, N, Tab, Left Alt, the middle mouse button, 5 to 9.

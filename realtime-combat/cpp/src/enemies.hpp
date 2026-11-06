@@ -84,6 +84,9 @@ namespace rtc::enemies
         return all.emplace(animal, e).first->second;
     }
 
+    // Whether the mod keeps a record of it (it's been hit, so it's in a fight).
+    inline auto known(UObject* animal) -> bool { return state().all.contains(animal); }
+
     inline auto defeated(UObject* animal) -> bool
     {
         auto& all = state().all;

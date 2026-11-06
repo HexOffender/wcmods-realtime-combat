@@ -187,8 +187,8 @@ def test_no_fight_while_on(agent):
 
 
 def test_walking_into_an_animal(agent):
-    """While it's on, your cat walking into an animal bumps into it: no fight (the game's encounter capsule is off),
-    and your cat doesn't pass through it."""
+    """While it's on, your cat walking into an animal starts no fight (the game's encounter capsule is off); one it's
+    fighting (locked on to) it bumps into rather than passing through."""
     import helpers as h
     _sandbox(agent, True)
     _until_state(agent, "on")
@@ -197,10 +197,20 @@ def test_walking_into_an_animal(agent):
         agent.keys("W", hold=1.5)
         time.sleep(0.5)
         assert not agent.lua("return Game.combat.active()"), "walking into the rabbit started a turn-based fight"
-        gap = agent.lua("""local a, me = WCMODS_SCENE.rabbit:K2_GetActorLocation(), Game.cat():location()
-            return math.sqrt((a.X - me.X)^2 + (a.Y - me.Y)^2)""")
-        assert gap > 35, f"your cat is {gap:.0f} units from the rabbit's middle: it went into it"
+        agent.lua("local h = WCMODS_HOME Game.cat():teleport(h.X, h.Y, h.Z) return true")
+        h.action(agent, "lock")
+        h.until(agent, f'({h.MOD}.get("blocking") or 0) >= 1', 2, "its body to block")
+        agent.keys("W", hold=1.5)
+        time.sleep(0.5)
+        assert not agent.lua("return Game.combat.active()"), "walking into the rabbit started a turn-based fight"
+        # how far past the rabbit your cat got, along the way it walked (below 0: still this side of it)
+        past = agent.lua("""local a, me = WCMODS_SCENE.rabbit:K2_GetActorLocation(), Game.cat():location()
+            local yaw = math.rad(WCMODS_SCENE_YAW)
+            return (me.X - a.X) * math.cos(yaw) + (me.Y - a.Y) * math.sin(yaw)""")
+        assert past < -20, f"your cat got {past:.0f} units past the rabbit's middle: it went through it"
     finally:
+        if h.get(agent, "locked"):
+            h.action(agent, "lock")
         h.clear_scene(agent)
 
 

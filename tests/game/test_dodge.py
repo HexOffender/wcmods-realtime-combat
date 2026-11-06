@@ -94,9 +94,16 @@ def test_safe_then_not_and_stamina(agent):
 
 
 def test_a_wall_stops_it(agent):
-    """Something in the way (a rabbit 1.5 m to the right) stops the hop short of it."""
+    """An animal in a fight with your cat (locked on to) 1.5 m to the right stops the hop short of it."""
     h.scene(agent, {"wall": (90, 150)})
-    moved, _ = _dodge(agent, "dodge_right")
+    agent.lua("""local r = Game.controller():GetControlRotation()
+        Game.controller():SetControlRotation({ Pitch = r.Pitch, Yaw = WCMODS_SCENE_YAW + 90, Roll = 0 }) return true""")
+    time.sleep(0.3)
+    h.action(agent, "lock")
+    h.until_value(agent, "locked", True)
+    h.until(agent, f'({h.MOD}.get("blocking") or 0) >= 1', 2, "its body to block")
+    moved, _ = _dodge(agent, "dodge_forward")   # the camera on it: forward is toward it
+    h.action(agent, "lock")
     assert moved < 130, f"your cat went {moved:.0f} units, through what was in the way"
 
 

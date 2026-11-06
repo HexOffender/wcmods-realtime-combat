@@ -1,4 +1,5 @@
-// dodge.hpp: step 4, the dodge. Left Alt hops your cat the way the player's moving (or straight back, standing still):
+// dodge.hpp: step 4, the dodge. Left Alt hops your cat the way the player's moving (its keys, or failing those the way
+// your cat's going; straight back, standing still):
 // the game's side hop (Animation.Combat.Dodge.Left/Right) to that side, or, forward and back, your cat turned so its
 // right hop goes that way, and slid about 3 m along the ground while the hop's in the air (rules.hpp's DodgeSpec). For
 // its first 0.4 s nothing hurts your cat (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an
@@ -45,6 +46,8 @@ namespace rtc::dodge
         if (!s.on) return;
         UObject* me = wcmods::player();
         if (me && s.montage && game::montage_on(me, s.montage)) game::stop_montage(me, s.montage, 0.2);
+        // a forward or back dodge turned your cat side-on: locked on, it faces its target again
+        if (me && lockon::locked()) game::turn_to(me, lockon::locked());
         s.on = false;
         s.montage = nullptr;
         wcmods::share("dodge", false);
@@ -70,6 +73,9 @@ namespace rtc::dodge
         {
             auto [forward, right] = game::move_input();
             s.way = dodge_yaw(view->yaw, *facing, forward, right);
+            // no movement key it knows held, but your cat's moving (keys moved by a remapper, say): that way
+            if (std::hypot(forward, right) < 0.2)
+                if (auto moving = game::moving_yaw(me)) s.way = *moving;
         }
         const DodgePose pose = dodge_pose(*facing, s.way);
         if (std::abs(turn(pose.cat_yaw, *facing)) > 0.5) game::set_facing(me, pose.cat_yaw);

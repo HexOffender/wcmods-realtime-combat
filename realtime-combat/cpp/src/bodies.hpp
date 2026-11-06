@@ -1,18 +1,21 @@
 // bodies.hpp: the animals' bodies while real-time combat is on. In the game a roaming animal's body overlaps cats rather
 // than blocking them, and each has an ExplorationEncounterCollision capsule that starts the game's own turn-based
 // fight when a cat overlaps it, whether or not the animal has noticed the cat (seen in game: your cat slid into a
-// rabbit that ignored it, and a fight started). So while it's on, for each animal within 5,000 units (a look twice a
-// second): its encounter capsule ignores cats, and its body blocks them, so your cat bumps into it instead. Off, each
-// is put back as it was.
+// rabbit that ignored it, and a fight started). So while it's on, for each animal within 5,000 units (a look once a
+// second): its encounter capsule ignores cats. And an animal in a fight with your cat (locked on to, or hit) has a
+// body that blocks, so your cat bumps into it rather than passing through; the rest keep theirs, which other cats (a
+// Clan's patrols) walk through as before. Off, each is put back as it was.
 //
-// Shared for tests: "bodies" (how many animals are set so).
+// Shared for tests: "bodies" (how many animals are set so), "blocking" (how many of them block).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
 
 #include <map>
 
+#include "enemies.hpp"
 #include "game.hpp"
+#include "lockon.hpp"
 
 namespace rtc::bodies
 {
@@ -26,11 +29,13 @@ namespace rtc::bodies
         UObject* encounter{};
         UObject* body{};
         int encounter_was = overlap, body_was = overlap;
+        bool blocking = false;
     };
     struct State
     {
         std::map<UObject*, Kept> set;
         double next = 0;
+        int blocking_shared = -1;
     };
     inline auto state() -> State&
     {
@@ -53,7 +58,10 @@ namespace rtc::bodies
                }).has_value();
     }
 
-    // One animal set: its encounter capsule ignoring cats, its body blocking them; what they were kept.
+    // Whether an animal's in a fight with your cat: locked on to, or hit (the mod keeps its health).
+    inline auto fighting(UObject* animal) -> bool { return lockon::locked() == animal || enemies::known(animal); }
+
+    // One animal set: its encounter capsule ignoring cats; what it and its body were kept.
     inline auto take(UObject* animal) -> void
     {
         Kept k;
@@ -64,7 +72,6 @@ namespace rtc::bodies
         if (k.body)
             if (auto was = response(k.body)) k.body_was = *was;
         if (k.encounter) set_response(k.encounter, ignore);
-        if (k.body) set_response(k.body, block);
         state().set[animal] = k;
     }
 
@@ -75,13 +82,28 @@ namespace rtc::bodies
         if (k.body && game::staying(k.body)) set_response(k.body, k.body_was);
     }
 
-    // Every frame while real-time combat is on: twice a second, the animals that have come near are set.
+    // Every frame while real-time combat is on: each animal set has a body that blocks while it's in a fight, and as it
+    // was otherwise; once a second, the animals that have come near are set.
     inline auto frame(double dt) -> void
     {
         State& s = state();
+        int blocking = 0;
+        for (auto& [animal, k] : s.set)
+        {
+            if (!k.body || !game::staying(k.body)) continue;
+            const bool should = fighting(animal);
+            if (should != k.blocking)
+            {
+                set_response(k.body, should ? block : k.body_was);
+                k.blocking = should;
+            }
+            blocking += k.blocking ? 1 : 0;
+        }
+        if (blocking != s.blocking_shared) wcmods::share("blocking", blocking);
+        s.blocking_shared = blocking;
         s.next -= dt;
         if (s.next > 0) return;
-        s.next = 0.5;
+        s.next = 1.0;
         std::erase_if(s.set, [](auto& e) { return !game::staying(e.first); });
         for (const wcmods::Animal& a : wcmods::animals(5000))
             if (!s.set.contains(a.actor)) take(a.actor);
@@ -95,6 +117,8 @@ namespace rtc::bodies
         for (auto& [animal, k] : s.set) give_back(animal, k);
         s.set.clear();
         s.next = 0;
+        s.blocking_shared = -1;
         wcmods::share("bodies", 0);
+        wcmods::share("blocking", 0);
     }
 } // namespace rtc::bodies
