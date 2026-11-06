@@ -60,7 +60,7 @@ namespace rtc::dodge
         State& s = state();
         UObject* me = wcmods::player();
         auto facing = game::facing(me);
-        auto view = game::control_rotation();
+        auto view = game::view_yaw();   // the game walks your cat relative to its camera
         if (!me || !facing || !view) return false;
         const DodgeSpec d;
         if (!stamina::spend(d.stamina))
@@ -68,11 +68,11 @@ namespace rtc::dodge
             wcmods::share("dodge_refused", ++s.refused);
             return false;
         }
-        if (way_from_camera) s.way = view->yaw + *way_from_camera;
+        if (way_from_camera) s.way = *view + *way_from_camera;
         else
         {
             auto [forward, right] = game::move_input();
-            s.way = dodge_yaw(view->yaw, *facing, forward, right);
+            s.way = dodge_yaw(*view, *facing, forward, right);
             // no movement key it knows held, but your cat's moving (keys moved by a remapper, say): that way
             if (std::hypot(forward, right) < 0.2)
                 if (auto moving = game::moving_yaw(me)) s.way = *moving;

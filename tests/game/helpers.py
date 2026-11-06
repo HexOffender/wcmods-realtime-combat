@@ -79,7 +79,8 @@ local me = Game.cat():location()
 local places = %(places)s
 -- a way to face where every place is on ground about level with your cat (at the test cat's spot the ground drops
 -- away one way), tried from the camera's yaw round in eighths; the camera turned to it
-local start = Game.controller():GetControlRotation().Yaw
+local cam = Game.controller().PlayerCameraManager.ViewTarget.Target
+local start = cam:K2_GetActorRotation().Yaw
 local yaw, spots
 for k = 0, 7 do
     local try, ok = start + k * 45, {}
@@ -97,6 +98,7 @@ end
 if not yaw then return "no level ground round your cat for the scene" end
 local pitch = Game.controller():GetControlRotation().Pitch
 Game.controller():SetControlRotation({ Pitch = pitch, Yaw = yaw, Roll = 0 })
+cam:K2_SetActorRotation({ Pitch = 0, Yaw = yaw, Roll = 0 }, false)   -- the game's camera turns from its root
 Game.player():K2_SetActorRotation({ Pitch = 0, Yaw = yaw, Roll = 0 }, false)   -- your cat faces that way too
 WCMODS_SCENE_YAW = yaw
 for _, n in ipairs(Game.animals.near(3000)) do Game.animals.remove(n.actor) end
@@ -141,7 +143,20 @@ def clear_scene(agent):
 
 
 def control_yaw(agent):
-    return agent.lua("return Game.controller():GetControlRotation().Yaw")
+    """Which way the game's camera looks (its root, which the game turns it from; not the controller)."""
+    return agent.lua("return Game.controller().PlayerCameraManager.ViewTarget.Target:K2_GetActorRotation().Yaw")
+
+
+def shown_yaw(agent):
+    """Which way the view shown looks (the camera manager's), with the arm's easing and the game's lean ahead."""
+    return agent.lua("return Game.controller().PlayerCameraManager.CameraCachePrivate.POV.Rotation.Yaw")
+
+
+def set_view_yaw(agent, yaw):
+    agent.lua(f"""local r = Game.controller():GetControlRotation()
+        Game.controller():SetControlRotation({{ Pitch = r.Pitch, Yaw = {yaw}, Roll = 0 }})
+        Game.controller().PlayerCameraManager.ViewTarget.Target:K2_SetActorRotation({{ Pitch = 0, Yaw = {yaw}, Roll = 0 }}, false)
+        return true""")
 
 
 def yaw_to(agent, name):

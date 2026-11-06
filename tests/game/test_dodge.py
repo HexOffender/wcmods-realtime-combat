@@ -96,8 +96,7 @@ def test_safe_then_not_and_stamina(agent):
 def test_a_wall_stops_it(agent):
     """An animal in a fight with your cat (locked on to) 1.5 m to the right stops the hop short of it."""
     h.scene(agent, {"wall": (90, 150)})
-    agent.lua("""local r = Game.controller():GetControlRotation()
-        Game.controller():SetControlRotation({ Pitch = r.Pitch, Yaw = WCMODS_SCENE_YAW + 90, Roll = 0 }) return true""")
+    h.set_view_yaw(agent, agent.lua("return WCMODS_SCENE_YAW") + 90)
     time.sleep(0.3)
     h.action(agent, "lock")
     h.until_value(agent, "locked", True)
