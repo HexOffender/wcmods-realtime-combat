@@ -7,12 +7,20 @@ Run with wcmods' agent, the mod and Sandbox mode 0.7 installed:
     python <wcmods>/wcmods.py agent install --with <this repo>/realtime-combat --with <wcmods-sandbox>/sandbox
     python <wcmods>/wcmods.py agent test tests/game
 
+This file's name puts it last in a run: one of its tests plays one of the game's own fights (and flees), and after a
+fight the game moves the view to a new exploration camera only a while later, so for a time the camera doesn't follow
+a turn made by a script (seen in game; a player with the mod on gets no such fight).
+
 The tests say whether the cat in play is a sandbox cat by sharing "Sandbox.ready" from the agent's Lua bridge, as
 Sandbox mode would, and put back what Sandbox mode itself says after each. (The dev save's cat, slot 8, is a sandbox
 cat: Sandbox mode clears its story quests as it comes into the forest, so put the save back after a run.)"""
+import os
+import sys
 import time
 
 from wcmods.agent import skip
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 MOD = 'WCModsCpp.mods["realtime-combat"]'
 
@@ -176,6 +184,24 @@ def test_no_fight_while_on(agent):
         skip("no pounce started a fight with the mod off either, so this spot proves nothing")
     _leave_fight(agent)
     agent.lua("local h = WCMODS_HOME Game.cat():teleport(h.X, h.Y, h.Z) Game.save.write() return true")
+
+
+def test_walking_into_an_animal(agent):
+    """While it's on, your cat walking into an animal bumps into it: no fight (the game's encounter capsule is off),
+    and your cat doesn't pass through it."""
+    import helpers as h
+    _sandbox(agent, True)
+    _until_state(agent, "on")
+    h.scene(agent, {"rabbit": (0, 120)})
+    try:
+        agent.keys("W", hold=1.5)
+        time.sleep(0.5)
+        assert not agent.lua("return Game.combat.active()"), "walking into the rabbit started a turn-based fight"
+        gap = agent.lua("""local a, me = WCMODS_SCENE.rabbit:K2_GetActorLocation(), Game.cat():location()
+            return math.sqrt((a.X - me.X)^2 + (a.Y - me.Y)^2)""")
+        assert gap > 35, f"your cat is {gap:.0f} units from the rabbit's middle: it went into it"
+    finally:
+        h.clear_scene(agent)
 
 
 def test_switched_off_in_its_settings(agent):

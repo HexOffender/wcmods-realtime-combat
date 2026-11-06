@@ -230,8 +230,36 @@ static void enemies_have_health_by_kind_and_level()
     CHECK(near(rtc::after_hit(10, -5), 10));
 }
 
+static void the_dodge()
+{
+    const rtc::DodgeSpec d;
+    CHECK(rtc::duration(d) > 0.4 && rtc::duration(d) < 1.0);
+    CHECK(rtc::slide_start(d) < rtc::slide_end(d) && rtc::slide_end(d) <= rtc::duration(d));
+    CHECK(near(rtc::slide_speed(d) * (rtc::slide_end(d) - rtc::slide_start(d)), d.distance));
+    CHECK(rtc::safe_at(d, 0) && rtc::safe_at(d, 0.3) && !rtc::safe_at(d, 0.5) && !rtc::safe_at(d, -0.1));
+    // the way the player's moving, as the camera sees it; standing still, straight back
+    CHECK(near(rtc::dodge_yaw(0, 50, 1, 0), 0));
+    CHECK(near(rtc::dodge_yaw(0, 50, 0, 1), 90));
+    CHECK(near(rtc::dodge_yaw(30, 50, 0, -1), -60));
+    CHECK(near(rtc::dodge_yaw(0, 50, 0, 0), 230));
+    CHECK(near(rtc::dodge_yaw(0, 50, 0.1, 0.1), 230));
+    // to the side: the hop that way, facing kept; forward or back: turned so the right hop goes that way
+    rtc::DodgePose right = rtc::dodge_pose(0, 90);
+    CHECK(right.right && near(right.cat_yaw, 0));
+    rtc::DodgePose left = rtc::dodge_pose(0, -100);
+    CHECK(!left.right && near(left.cat_yaw, 0));
+    rtc::DodgePose back = rtc::dodge_pose(0, 180);
+    CHECK(back.right && near(rtc::turn(back.cat_yaw + 90, 180), 0));
+    rtc::DodgePose ahead = rtc::dodge_pose(20, 25);
+    CHECK(ahead.right && near(rtc::turn(ahead.cat_yaw + 90, 25), 0));
+    // out of an attack only once it's landed
+    const auto& light = rtc::spec(rtc::Attack::Light);
+    CHECK(!rtc::can_dodge_out_of(light, 0.1) && rtc::can_dodge_out_of(light, rtc::hit_at(light)));
+}
+
 int main()
 {
+    the_dodge();
     gate_is_on_only_for_a_sandbox_cat_in_the_world();
     gate_says_the_first_reason();
     every_state_has_words_and_a_code();

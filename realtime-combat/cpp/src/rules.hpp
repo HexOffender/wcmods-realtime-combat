@@ -321,4 +321,50 @@ namespace rtc
     }
     // What's left after a hit, and whether that was the last of it.
     inline auto after_hit(double health, double damage) -> double { return std::max(0.0, health - std::max(0.0, damage)); }
+
+    // ------------------------------------------------------------------------------------------- the dodge
+    // The game has a hop to each side (Animation.Combat.Dodge.Left/Right, 2 s each): crouched to about 0.3 s, the hop
+    // from about 0.4 s to 0.8 s, landed by 1.0 s (seen in game). A dodge plays from `from` to `to` at `rate`, slides your
+    // cat `distance` cm while the hop's in the air (slide_from to slide_to, montage seconds), and nothing hurts it for
+    // its first `safe` real seconds.
+    struct DodgeSpec
+    {
+        double from = 0.25, to = 1.15, rate = 1.4;
+        double slide_from = 0.35, slide_to = 0.85;
+        double distance = 300;
+        double safe = 0.4;
+        double stamina = 15;
+    };
+    inline auto duration(const DodgeSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    // Real seconds from the press when the slide starts and ends.
+    inline auto slide_start(const DodgeSpec& s) -> double { return std::max(0.0, s.slide_from - s.from) / s.rate; }
+    inline auto slide_end(const DodgeSpec& s) -> double { return (s.slide_to - s.from) / s.rate; }
+    inline auto slide_speed(const DodgeSpec& s) -> double { return s.distance / std::max(0.01, slide_end(s) - slide_start(s)); }
+    inline auto safe_at(const DodgeSpec& s, double t) -> bool { return t >= 0 && t < s.safe; }
+
+    // Which way it goes: the way the player's moving (forward and right from -1 to 1, as the camera sees them), or
+    // straight back from where your cat faces when they aren't.
+    inline auto dodge_yaw(double camera_yaw, double cat_yaw, double forward, double right) -> double
+    {
+        if (std::hypot(forward, right) < 0.2) return cat_yaw + 180;
+        return camera_yaw + std::atan2(right, forward) * degrees_per_radian;
+    }
+
+    // How it's played: a hop to the side the dodge goes, with your cat facing as it does when that's to its side;
+    // forward or back, your cat's turned so the hop to its right goes that way.
+    struct DodgePose
+    {
+        bool right = true;
+        double cat_yaw = 0;
+    };
+    inline auto dodge_pose(double cat_yaw, double yaw) -> DodgePose
+    {
+        const double a = turn(cat_yaw, yaw);
+        if (a >= 30 && a <= 150) return {true, cat_yaw};
+        if (a <= -30 && a >= -150) return {false, cat_yaw};
+        return {true, yaw - 90};
+    }
+
+    // A dodge can cut an attack short once it's landed, not in its wind-up.
+    inline auto can_dodge_out_of(const AttackSpec& a, double elapsed) -> bool { return elapsed >= hit_at(a); }
 } // namespace rtc

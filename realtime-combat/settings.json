@@ -18,6 +18,9 @@
     ],
     "heavy_attack": [
       "G"
+    ],
+    "dodge": [
+      "LeftAlt"
     ]
   },
   "cat_damage": 1,

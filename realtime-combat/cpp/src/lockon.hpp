@@ -173,14 +173,18 @@ namespace rtc::lockon
     inline auto place_marker(double dt) -> void
     {
         State& s = state();
+        // twice a second, the HUD on screen: the game makes a new one after a fight or a new area, while the old one may
+        // linger off screen a while
         s.hud_check -= dt;
-        if ((!s.canvas || !s.marker) && s.hud_check <= 0)
+        if (s.hud_check <= 0)
         {
             s.hud_check = 0.5;
             wcmods::Widget hud = wcmods::ui::hud();
             wcmods::Widget layer = hud ? hud.find(L"CanvasExploration") : wcmods::Widget{};
+            wcmods::share("marker_hud", !hud ? "none" : !layer ? "no layer" : layer == s.canvas ? "same" : "new");
             if (layer && (layer != s.canvas || !s.marker))
             {
+                if (s.marker) s.marker.remove();
                 s.canvas = layer;
                 s.marker = wcmods::ui::rect(wcmods::UiColor::hex(L"#fff4d6"), 26, 26);
                 wcmods::Slot slot = layer.add(s.marker);
@@ -196,10 +200,13 @@ namespace rtc::lockon
         auto screen = where ? game::on_screen(*where) : std::nullopt;
         if (!screen)
         {
+            wcmods::share("marker_hud", "off screen: " + game::on_screen_why());
             show_marker(false);
             return;
         }
         s.marker.slot().position(screen->first, screen->second);
+        wcmods::share("marker_x", screen->first);
+        wcmods::share("marker_y", screen->second);
         show_marker(true);
     }
 
