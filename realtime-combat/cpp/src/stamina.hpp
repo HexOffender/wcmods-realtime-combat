@@ -34,6 +34,17 @@ namespace rtc::stamina
         return true;
     }
 
+    // Hold it where it is (a guard raised: none comes back while it's up), without spending any.
+    inline auto hold() -> void
+    {
+        auto r = wcmods::cat().stamina();
+        if (!r) return;
+        State& s = state();
+        s.resource = r;
+        if (s.held < 0 || *r.value < s.held) s.held = *r.value;
+        s.pause = stamina_pause;
+    }
+
     // Every frame while real-time combat is on: while an action plays (`busy`) and for the pause after, it doesn't
     // come back (it can still go down, as running spends it).
     inline auto frame(double dt, bool busy) -> void

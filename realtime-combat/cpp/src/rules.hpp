@@ -489,6 +489,7 @@ namespace rtc
         double t = 0;          // seconds in this state
         double cooldown = 0;   // seconds until it may attack again
         double far_for = 0;    // seconds it's been past give_up_range
+        double reel_for = 0;   // how long this reel lasts
         bool landed = false;
     };
     // What a step of time asks the caller to do.
@@ -540,7 +541,7 @@ namespace rtc
             }
             return FoeDo::Nothing;
         case FoeState::Reel:
-            if (f.t >= s.stagger)
+            if (f.t >= f.reel_for)
             {
                 f.state = FoeState::Chase;
                 f.t = 0;
@@ -551,16 +552,85 @@ namespace rtc
         }
         return FoeDo::Nothing;
     }
-    // Your cat hit it: in its wind-up (before it lands) that stops the attack and it reels; true when it did.
-    inline auto stagger(Foe& f) -> bool
+    // Your cat hit it: in its wind-up (before it lands) that stops the attack and it reels `seconds` (FoeSpec's
+    // stagger); true when it did.
+    inline auto stagger(Foe& f, double seconds) -> bool
     {
         if (f.state != FoeState::WindUp || f.landed) return false;
         f.state = FoeState::Reel;
         f.t = 0;
+        f.reel_for = seconds;
         return true;
+    }
+    // Your cat parried it: whatever it was doing, it reels `seconds`, open to a riposte.
+    inline auto parried(Foe& f, double seconds) -> void
+    {
+        f.state = FoeState::Reel;
+        f.t = 0;
+        f.reel_for = seconds;
+        f.landed = true;
     }
     // Whether it holds the turn to attack (only one animal attacks at a time; the others wait close).
     inline auto attacking(const Foe& f) -> bool { return f.state == FoeState::WindUp || f.state == FoeState::Recover; }
+
+    // ------------------------------------------------------------------------------------------- blocking and parrying
+    // Hold the block key: your cat crouches in a guard (a stand-in: its Stone Guard fight move, held at 1.0 s, its low
+    // crouch). A hit landing from in front (within `front` degrees of its facing) while it guards does `chip` of its
+    // damage, and its damage comes off stamina instead; with too little stamina, the guard breaks (your cat's open and
+    // reels `break_for` seconds, taking the chip). A guard begun just before the hit lands (within `parry_window`) is a
+    // parry (a stand-in: Hissing Parry, 0.9 s to 1.6 s): no damage, and the animal reels `parry_reel` seconds, open to a
+    // riposte: your cat's next hit on it in that time does `riposte` times its damage. (A guard raised again within half a
+    // second of dropping can't parry: guard.hpp.)
+    struct GuardSpec
+    {
+        std::wstring_view guard_tag = L"Gameplay.Combat.Attack.RiverClan.3";
+        double guard_pose = 1.0;
+        std::wstring_view parry_tag = L"Gameplay.Combat.Attack.RiverClan.6";
+        double parry_from = 0.9, parry_to = 1.6, parry_rate = 1.3;
+        double front = 75;
+        double chip = 0.25;
+        double stamina_per_damage = 1.0;
+        double break_for = 1.0;
+        double parry_window = 0.2;
+        double parry_reel = 2.0;
+        double riposte = 3.0;
+    };
+    enum class Guarded
+    {
+        Hit,          // not guarding, or the hit came from behind
+        Blocked,
+        GuardBroken,
+        Parried,
+    };
+    constexpr auto code(Guarded g) -> std::string_view
+    {
+        switch (g)
+        {
+        case Guarded::Hit: return "hit";
+        case Guarded::Blocked: return "blocked";
+        case Guarded::GuardBroken: return "guard-broken";
+        case Guarded::Parried: return "parried";
+        }
+        return "";
+    }
+    struct GuardResult
+    {
+        Guarded what = Guarded::Hit;
+        double health = 0;    // what comes off your cat's health
+        double stamina = 0;   // and off its stamina
+    };
+    // A hit of `damage` landing on your cat: guarding for `held_for` seconds (or not), the attacker in front of it or
+    // not, with `stamina` left.
+    inline auto guard(bool guarding, double held_for, bool in_front, double stamina, double damage, const GuardSpec& s = {})
+        -> GuardResult
+    {
+        if (!guarding || !in_front) return {Guarded::Hit, damage, 0};
+        if (held_for <= s.parry_window) return {Guarded::Parried, 0, 0};
+        const double cost = damage * s.stamina_per_damage;
+        if (stamina >= cost) return {Guarded::Blocked, damage * s.chip, cost};
+        return {Guarded::GuardBroken, damage * s.chip, stamina};
+    }
+    inline auto parry_duration(const GuardSpec& s) -> double { return (s.parry_to - s.parry_from) / s.parry_rate; }
 
     // ------------------------------------------------------------------------------------------- the flask
     // A drink: the game has no drinking animation, so its sniff (head down, as if lapping) stands in, played from `from`

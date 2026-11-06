@@ -24,6 +24,9 @@
     ],
     "drink": [
       "Z"
+    ],
+    "block": [
+      "RightMouseButton"
     ]
   },
   "cat_damage": 1,

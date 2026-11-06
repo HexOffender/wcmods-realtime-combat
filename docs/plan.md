@@ -87,7 +87,7 @@ buttons and shoulders are taken).
 | 4. Dodge | done: #4 (with the animals' bodies, below) |
 | 5. Enemies fight back | done: #5 |
 | 6. The flask | done: #7 |
-| 7. Blocking and parrying | |
+| 7. Blocking and parrying | done: #8 |
 | 8. The HUD, and falling | |
 | 9. The controller, settings, and the release | |
 
@@ -192,15 +192,16 @@ buttons and shoulders are taken).
 
 ### 7. Blocking and parrying (added after step 5)
 
-- **Block:** hold the right mouse button. The game's crouch on that button is held off while real-time combat
-  is on (Ctrl still crouches). A hit taken while blocking from in front does a quarter of its damage, and the rest
-  comes off stamina; with none left, the guard breaks (your cat staggers a moment, open).
+- **Block:** hold the right mouse button. (The game crouches on it too; dropping its crouch command doesn't stop
+  that, as the game keeps crouch going by the key itself, but the guard pose covers it, your cat standing still.)
+  A hit taken while blocking from in front does a quarter of its damage, and the rest comes off stamina; with none
+  left, the guard breaks (your cat staggers a moment, open).
 - **Parry:** start a block just before a hit lands (within about 0.2 s): no damage, and the animal's left reeling
   for 2 s; your cat's next attack on it in that time does three times the damage (a riposte).
 - **Animations:** stand-ins from your cat's own fight moves for now (a guard pose held for the block, a hiss for
   the parry: `StoneGuard`, `HunkerDown`, `HissingParry` in its table), to be animated properly later.
 - Tests: a blocked hit does a quarter and costs stamina, a guard breaks at no stamina, a parry stops the hit and
-  opens the animal to a riposte, and the right mouse button doesn't crouch while it's on.
+  opens the animal to a riposte, an attack drops the guard, and the right mouse button guards.
 
 ### 8. The HUD, and falling
 

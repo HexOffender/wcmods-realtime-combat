@@ -25,6 +25,7 @@ namespace rtc::input
         Lunge,
         Dodge,
         Drink,
+        Block,
         Hurt,   // tests only: your cat takes a small hit, as an animal's would
         Count,
     };
@@ -48,6 +49,7 @@ namespace rtc::input
             {Action::Lunge, "lunge", "lunge", {}},   // the light attack while running; a key of its own if the settings give one
             {Action::Dodge, "dodge", "dodge", {L"LeftAlt"}},
             {Action::Drink, "drink", "drink", {L"Z"}},
+            {Action::Block, "block", "block", {L"RightMouseButton"}},   // held (held(), below)
             {Action::Hurt, nullptr, "hurt", {}},   // tests only: no key can be put on it
         };
         return all;
@@ -118,6 +120,14 @@ namespace rtc::input
         return p;
     }
 
+    // Whether one of an action's keys is held now (the block). Tests say so with "RealtimeCombat.block" shared true.
+    inline auto held(Action a) -> bool
+    {
+        if (wcmods::shared("RealtimeCombat.block").boolean(false) && a == Action::Block) return true;
+        for (const std::wstring& key : state().keys[static_cast<size_t>(a)])
+            if (wcmods::key_down(key)) return true;
+        return false;
+    }
     // The keys an action is on, for the mod menu: "Tab, MiddleMouseButton".
     inline auto keys_of(Action a) -> std::wstring
     {
