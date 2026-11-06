@@ -52,9 +52,16 @@ def until_value(agent, name, want, timeout=3):
     raise AssertionError(f'the mod\'s "{name}" is {got!r}, not {want!r}, after {timeout} s')
 
 
-def turn_on(agent):
-    """The mod on: the game in front, Sandbox mode saying so."""
+def passive(agent, on):
+    """Keep the animals from fighting back (a test of the mod's own), or let them."""
+    agent.lua(f'WCModsCpp.share("RealtimeCombat.passive", {"true" if on else "false"}) return true')
+
+
+def turn_on(agent, fighting_back=False):
+    """The mod on: the game in front, Sandbox mode saying so. The animals don't fight back unless asked (step 5's
+    tests): the earlier steps' put animals held still beside your cat."""
     agent.hotkey("Home", focus=True)
+    passive(agent, not fighting_back)
     sandbox(agent, True)
     until_value(agent, "state", "on", 5)
 

@@ -257,8 +257,57 @@ static void the_dodge()
     CHECK(!rtc::can_dodge_out_of(light, 0.1) && rtc::can_dodge_out_of(light, rtc::hit_at(light)));
 }
 
+static void foes_hit_back()
+{
+    const rtc::FoeSpec s;
+    CHECK(rtc::hit_at(s) > 0.5 && rtc::hit_at(s) < rtc::duration(s));
+    CHECK(near(rtc::enemy_damage(L"SK_Rabbit", 14), 23));
+    CHECK(rtc::enemy_damage(L"SK_Fox", 5) > rtc::enemy_damage(L"SK_Mice", 5));
+    CHECK(near(rtc::enemy_damage(L"SK_Rabbit", 1, 0.5), 5));
+    CHECK(near(rtc::fresh_kill_for(L"SK_Rabbit"), 5) && near(rtc::fresh_kill_for(L"SK_Fox"), 0));
+
+    // far: it comes after your cat; close with the turn free: it attacks, lands, recovers, cools down
+    rtc::Foe f;
+    CHECK(rtc::step(f, s, 0.1, 600, 0, true, 2) == rtc::FoeDo::Nothing && f.state == rtc::FoeState::Chase);
+    CHECK(rtc::step(f, s, 0.1, 120, 0, true, 2) == rtc::FoeDo::StartAttack && f.state == rtc::FoeState::WindUp);
+    CHECK(rtc::attacking(f));
+    CHECK(rtc::step(f, s, 0.5, 120, 0, true, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(f, s, 0.3, 120, 0, true, 2) == rtc::FoeDo::Land && f.state == rtc::FoeState::Recover);
+    CHECK(rtc::step(f, s, 0.1, 120, 0, true, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(f, s, 0.5, 120, 0, true, 2) == rtc::FoeDo::EndAttack && f.state == rtc::FoeState::Chase);
+    CHECK(near(f.cooldown, 2));
+    // cooling down: no attack, even close with the turn free
+    CHECK(rtc::step(f, s, 1.0, 120, 0, true, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(f, s, 1.1, 120, 0, true, 2) == rtc::FoeDo::StartAttack);
+    // not its turn: it waits
+    rtc::Foe g;
+    CHECK(rtc::step(g, s, 0.1, 120, 0, false, 2) == rtc::FoeDo::Nothing && g.state == rtc::FoeState::Chase);
+    // hit in its wind-up: it reels, then chases with a cooldown; after it's landed a hit doesn't stop it
+    rtc::Foe h;
+    rtc::step(h, s, 0.1, 120, 0, true, 2);
+    CHECK(rtc::stagger(h) && h.state == rtc::FoeState::Reel && !rtc::attacking(h));
+    CHECK(rtc::step(h, s, 0.6, 120, 0, true, 2) == rtc::FoeDo::EndAttack && h.state == rtc::FoeState::Chase);
+    rtc::Foe k;
+    rtc::step(k, s, 0.1, 120, 0, true, 2);
+    rtc::step(k, s, 0.8, 120, 0, true, 2);   // landed
+    CHECK(!rtc::stagger(k));
+    // too far for too long: it gives up
+    rtc::Foe far;
+    CHECK(rtc::step(far, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(far, s, 2, 3000, 0, true, 2) == rtc::FoeDo::GiveUp);
+    // led too far from where it joined, though it's kept up with your cat: it gives up too
+    rtc::Foe led;
+    CHECK(rtc::step(led, s, 2, 150, 2500, false, 2) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(led, s, 2, 150, 2500, false, 2) == rtc::FoeDo::GiveUp);
+    rtc::Foe back;
+    rtc::step(back, s, 2, 3000, 0, true, 2);
+    rtc::step(back, s, 0.1, 500, 0, true, 2);   // came back near: the count starts again
+    CHECK(rtc::step(back, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
+}
+
 int main()
 {
+    foes_hit_back();
     the_dodge();
     gate_is_on_only_for_a_sandbox_cat_in_the_world();
     gate_says_the_first_reason();

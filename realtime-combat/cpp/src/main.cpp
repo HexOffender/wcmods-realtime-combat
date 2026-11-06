@@ -8,7 +8,8 @@
 // bodies block your cat with their encounter capsules off (bodies.hpp), so walking into one starts none either.
 //
 // Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp and the
-// stamina in stamina.hpp. The dodge (step 4): dodge.hpp. Each runs every frame while it's on.
+// stamina in stamina.hpp. The dodge (step 4): dodge.hpp. The animals fighting back (step 5): foes.hpp. Each runs
+// every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -23,6 +24,7 @@
 #include "bodies.hpp"
 #include "dodge.hpp"
 #include "enemies.hpp"
+#include "foes.hpp"
 #include "game.hpp"
 #include "input.hpp"
 #include "lockon.hpp"
@@ -92,8 +94,10 @@ namespace
                 rtc::lockon::release("off");
                 rtc::attacks::end();
                 rtc::dodge::end();
+                rtc::foes::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
+                rtc::game::forget_animals();
                 rtc::enemies::clear();
                 wcmods::log(L"off ({}): the animals notice your cat again", rtc::why(off));
             }
@@ -106,6 +110,7 @@ namespace
     auto frame(float dt) -> void
     {
         if (!gate().on || !wcmods::player()) return;
+        rtc::game::tick(dt);
         rtc::bodies::frame(dt);
         rtc::input::Pressed pressed = rtc::input::poll();
         rtc::lockon::frame(dt, pressed);
@@ -115,6 +120,9 @@ namespace
                 pressed.on[static_cast<size_t>(a)] = false;
         rtc::attacks::frame(dt, pressed);
         rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy());
+        // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
+        if (!wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
+        else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
         rtc::enemies::frame(dt);
     }
 
@@ -122,7 +130,7 @@ namespace
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one, attack it and dodge.");
+                L"Work in progress: lock on, attack and dodge; the animals fight back. Falling and healing come next.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -149,6 +157,7 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::lockon::load();
         rtc::attacks::load();
         rtc::enemies::load();
+        rtc::foes::load();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();

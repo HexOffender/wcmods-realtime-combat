@@ -367,4 +367,168 @@ namespace rtc
 
     // A dodge can cut an attack short once it's landed, not in its wind-up.
     inline auto can_dodge_out_of(const AttackSpec& a, double elapsed) -> bool { return elapsed >= hit_at(a); }
+
+    // ------------------------------------------------------------------------------------------- the animals fight back
+    // An animal's attack is its own default fight animation (Gameplay.Combat.Attack.Default, 4.3 s like your cat's: it
+    // strikes at about 1.6 to 1.9 s, seen in game), played from `from` to `to`, landing at `hit`: about 0.75 s of wind-up
+    // to see it coming.
+    struct FoeSpec
+    {
+        std::wstring_view tag = L"Gameplay.Combat.Attack.Default";
+        double from = 1.0, to = 2.2, hit = 1.75, rate = 1.0;
+        double reach = 170, cone = 60;
+        double engage = 400;           // an animal this near your cat joins the fight (cm)
+        double attack_range = 150;     // close enough to start an attack
+        double follow = 110;           // how near it keeps while it waits its turn
+        double speed = 330;            // how fast it comes after your cat (cm/s)
+        double cooldown_min = 1.4, cooldown_max = 2.6;   // between its attacks
+        double give_up_range = 2500;   // farther than this from your cat,
+        double leash = 2000;           // or than this from where it joined the fight,
+        double give_up_after = 3;      // for this long: it goes back to roaming
+        double stagger = 0.5;          // a hit in its wind-up stops the attack; it reels this long
+    };
+    inline auto duration(const FoeSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    inline auto hit_at(const FoeSpec& s) -> double { return (s.hit - s.from) / s.rate; }
+
+    // How hard an animal hits your cat: a base for its kind, grown 10% a level past the first, times a setting (a
+    // rabbit at level 14 takes 23 of a cat's 178).
+    inline auto base_damage(std::wstring_view model) -> double
+    {
+        std::wstring m(model);
+        for (auto& c : m) c = static_cast<wchar_t>(std::towlower(c));
+        struct Kind
+        {
+            const wchar_t* part;
+            double damage;
+        };
+        static const Kind kinds[] = {{L"mice", 8}, {L"mouse", 8}, {L"rat", 9}, {L"rabbit", 10}, {L"squirrel", 9}, {L"bird", 9},
+                                     {L"crow", 10}, {L"snake", 16}, {L"adder", 16}, {L"fox", 20}, {L"badger", 26}, {L"dog", 28}};
+        for (const Kind& k : kinds)
+            if (m.find(k.part) != std::wstring::npos) return k.damage;
+        return 12;
+    }
+    inline auto enemy_damage(std::wstring_view model, int level, double multiplier = 1.0) -> double
+    {
+        return base_damage(model) * (1.0 + 0.1 * (std::clamp(level, 1, 60) - 1)) * multiplier;
+    }
+
+    // What a defeated animal puts on your Clan's fresh-kill pile: prey feeds the Clan (a mouse 3, a rabbit 5...), and a
+    // fox or a badger isn't prey.
+    inline auto fresh_kill_for(std::wstring_view model) -> double
+    {
+        std::wstring m(model);
+        for (auto& c : m) c = static_cast<wchar_t>(std::towlower(c));
+        struct Kind
+        {
+            const wchar_t* part;
+            double food;
+        };
+        static const Kind kinds[] = {{L"mice", 3}, {L"mouse", 3}, {L"rat", 3}, {L"rabbit", 5}, {L"squirrel", 4}, {L"bird", 4},
+                                     {L"crow", 4}, {L"snake", 2}, {L"adder", 2}};
+        for (const Kind& k : kinds)
+            if (m.find(k.part) != std::wstring::npos) return k.food;
+        return 0;
+    }
+
+    // An animal fighting your cat, as a state that moves on with time:
+    //   Chase:   it comes after your cat (and waits, close, for its turn);
+    //   WindUp:  its attack plays, landing at hit_at();
+    //   Recover: the rest of the attack, then its cooldown;
+    //   Reel:    hit in its wind-up, it reels a moment.
+    enum class FoeState
+    {
+        Chase,
+        WindUp,
+        Recover,
+        Reel,
+    };
+    constexpr auto code(FoeState s) -> std::string_view
+    {
+        switch (s)
+        {
+        case FoeState::Chase: return "chase";
+        case FoeState::WindUp: return "windup";
+        case FoeState::Recover: return "recover";
+        case FoeState::Reel: return "reel";
+        }
+        return "";
+    }
+    struct Foe
+    {
+        FoeState state = FoeState::Chase;
+        double t = 0;          // seconds in this state
+        double cooldown = 0;   // seconds until it may attack again
+        double far_for = 0;    // seconds it's been past give_up_range
+        bool landed = false;
+    };
+    // What a step of time asks the caller to do.
+    enum class FoeDo
+    {
+        Nothing,
+        StartAttack,   // stop following, face your cat, play the attack
+        Land,          // the hit: your cat in reach and in front, and not dodging, takes it
+        EndAttack,     // stop the attack's animation, follow again
+        GiveUp,        // too far for too long: back to roaming
+    };
+    // One step: `dt` seconds, your cat `distance` away, the animal `from_home` from where it joined the fight, `my_turn`
+    // true when no other animal is attacking. `next_cooldown` is the cooldown to start after an attack (the caller's
+    // random pick between cooldown_min and cooldown_max).
+    inline auto step(Foe& f, const FoeSpec& s, double dt, double distance, double from_home, bool my_turn, double next_cooldown)
+        -> FoeDo
+    {
+        f.t += dt;
+        f.cooldown = std::max(0.0, f.cooldown - dt);
+        f.far_for = distance > s.give_up_range || from_home > s.leash ? f.far_for + dt : 0;
+        if (f.far_for > s.give_up_after) return FoeDo::GiveUp;
+        switch (f.state)
+        {
+        case FoeState::Chase:
+            if (distance <= s.attack_range && f.cooldown <= 0 && my_turn)
+            {
+                f.state = FoeState::WindUp;
+                f.t = 0;
+                f.landed = false;
+                return FoeDo::StartAttack;
+            }
+            return FoeDo::Nothing;
+        case FoeState::WindUp:
+            if (!f.landed && f.t >= hit_at(s))
+            {
+                f.landed = true;
+                f.state = FoeState::Recover;
+                f.t = 0;
+                return FoeDo::Land;
+            }
+            return FoeDo::Nothing;
+        case FoeState::Recover:
+            if (f.t >= duration(s) - hit_at(s))
+            {
+                f.state = FoeState::Chase;
+                f.t = 0;
+                f.cooldown = next_cooldown;
+                return FoeDo::EndAttack;
+            }
+            return FoeDo::Nothing;
+        case FoeState::Reel:
+            if (f.t >= s.stagger)
+            {
+                f.state = FoeState::Chase;
+                f.t = 0;
+                f.cooldown = next_cooldown;
+                return FoeDo::EndAttack;
+            }
+            return FoeDo::Nothing;
+        }
+        return FoeDo::Nothing;
+    }
+    // Your cat hit it: in its wind-up (before it lands) that stops the attack and it reels; true when it did.
+    inline auto stagger(Foe& f) -> bool
+    {
+        if (f.state != FoeState::WindUp || f.landed) return false;
+        f.state = FoeState::Reel;
+        f.t = 0;
+        return true;
+    }
+    // Whether it holds the turn to attack (only one animal attacks at a time; the others wait close).
+    inline auto attacking(const Foe& f) -> bool { return f.state == FoeState::WindUp || f.state == FoeState::Recover; }
 } // namespace rtc

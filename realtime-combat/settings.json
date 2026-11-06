@@ -1,5 +1,5 @@
 {
-  "_help": "Real-time combat's settings; the mod menu's Real-time combat page shows them. enabled: real-time combat in Sandbox mode (false: the game's own fights there too). lock_on_reach_m: how far an animal can be to lock on to it (3 to 60 metres). cat_damage, enemy_health: multiples of your cat's damage and the animals' health (1 is as made). keys: the keys for each action, by Unreal's names (Tab, MiddleMouseButton, MouseScrollUp, F, LeftAlt, Gamepad_RightThumbstick...): one, or a list; [] for none. They're read as the game starts: restart it after changing them.",
+  "_help": "Real-time combat's settings; the mod menu's Real-time combat page shows them. enabled: real-time combat in Sandbox mode (false: the game's own fights there too). lock_on_reach_m: how far an animal can be to lock on to it (3 to 60 metres). cat_damage, enemy_health, enemy_damage: multiples of your cat's damage, the animals' health and their damage (1 is as made). keys: the keys for each action, by Unreal's names (Tab, MiddleMouseButton, MouseScrollUp, F, LeftAlt, Gamepad_RightThumbstick...): one, or a list; [] for none. They're read as the game starts: restart it after changing them.",
   "enabled": true,
   "lock_on_reach_m": 15,
   "keys": {
@@ -24,5 +24,6 @@
     ]
   },
   "cat_damage": 1,
-  "enemy_health": 1
+  "enemy_health": 1,
+  "enemy_damage": 1
 }

@@ -113,7 +113,7 @@ namespace rtc::lockon
     inline auto candidates(const LockSettings& ls) -> std::vector<std::pair<UObject*, Candidate>>
     {
         std::vector<std::pair<UObject*, Candidate>> out;
-        for (const wcmods::Animal& a : wcmods::animals(ls.range + 100))
+        for (const wcmods::Animal& a : game::animals(ls.range + 100))
         {
             auto where = game::at(a.actor);
             if (!where || enemies::defeated(a.actor)) continue;

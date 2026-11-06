@@ -82,7 +82,7 @@ buttons and shoulders are taken).
 | 2. Lock-on | done: #2 |
 | 3. Attacks, stamina and enemy health | done: #3 |
 | 4. Dodge | done: #4 (with the animals' bodies, below) |
-| 5. Enemies fight back | |
+| 5. Enemies fight back | done: #5 |
 | 6. The flask | |
 | 7. The HUD, and falling | |
 | 8. The controller, settings, and the release | |
@@ -158,6 +158,14 @@ buttons and shoulders are taken).
   One you run from (far, for long) goes back to roaming (its logic restarted).
 - Tests: an animal near starts fighting, its attack takes health, a dodge avoids it, it dies at no
   health and is gone, one left behind roams again.
+- **Built:** an animal joins within 4 m or when hit, follows your cat (`wcmods::follow`), and attacks with its own
+  default fight animation (also 4.3 s; played 1.0 to 2.2 s, landing at 1.75 s), turning to your cat until 0.3 s
+  before it lands. Only one attacks at a time. A hit in its wind-up makes it reel. Its damage grows with its level (a
+  rabbit at level 14: 23). Led over 20 m from where it joined, or 25 m from your cat, for 3 s, it goes back to roaming.
+- **Found:** the game levels your cat through native code only (its level component has no reflected functions, and
+  experience written past the next level leaves the level as it was), so a win gives no experience; prey goes on the
+  Clan's fresh-kill pile instead. And `wcmods::animals()` searches every object in the game: called several times a
+  second it made the game stutter, so the mod searches twice a second and everything shares the list.
 
 ### 6. The flask
 
@@ -191,6 +199,7 @@ buttons and shoulders are taken).
 - ~~Whether a pounce starts a fight while the animals ignore your cat~~: it doesn't (step 1). Step 5 checks
   it again for an animal the mod is moving (its own logic stopped).
 - What the game does with a cat at no health outside a fight (step 7; the mod steps in first either way).
-- Whether the game's experience can be given from C++ (step 5); if not, rewards are items.
+- ~~Whether the game's experience can be given from C++~~: not through anything reflected (step 5); prey
+  goes on the fresh-kill pile instead.
 - The game's attacks were made for staged fights: some (throws, sand, rocks) may look odd up close, and
   are left out of the moves until they're seen.
