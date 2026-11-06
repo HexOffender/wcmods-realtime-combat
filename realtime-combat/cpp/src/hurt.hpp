@@ -1,11 +1,14 @@
-// hurt.hpp: your cat taking a hit (step 5's animals' attacks, and the chip through a guard): health off (not below 1:
-// falling is step 8's), whatever it was doing cut short (an attack, a dodge past its safe moment, a drink, a guard),
-// and a short hit reaction: the game's own, cut after 0.45 s. A guard broken reels longer.
+// hurt.hpp: your cat taking a hit (step 5's animals' attacks, and the chip through a guard): health off, whatever it
+// was doing cut short (an attack, a dodge past its safe moment, a drink, a guard), and a short hit reaction: the game's
+// own, cut after 0.45 s. A guard broken reels longer. A hit that would leave no health leaves 1, and your cat falls
+// (fall.hpp, through on_fall: the game never sees a cat at 0 outside its fights).
 //
 // Shared for tests: "cat_hits" (how many hits your cat took).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
+
+#include <functional>
 
 #include "attacks.hpp"
 #include "dodge.hpp"
@@ -21,6 +24,7 @@ namespace rtc::hurt
         double left = 0;       // the hit reaction's seconds before it's cut short
         UObject* montage{};
         int hits = 0;
+        std::function<void()> on_fall;   // main.cpp's: fall::begin
     };
     inline auto state() -> State&
     {
@@ -38,7 +42,14 @@ namespace rtc::hurt
         UObject* me = wcmods::player();
         auto health = wcmods::cat().health();
         if (!me || !health) return;
+        const bool down = damage > 0 && *health.value - damage <= 0;
         if (damage > 0) *health.value = static_cast<float>(std::max(1.0, *health.value - damage));
+        if (down && s.on_fall)
+        {
+            wcmods::share("cat_hits", ++s.hits);
+            s.on_fall();
+            return;
+        }
         attacks::end();
         dodge::end();   // (past its safe moment: the hit cuts the hop short)
         flask::end();   // a drink stops, the charge spent

@@ -105,8 +105,12 @@ namespace rtc::blocking
         {
         case Guarded::Hit: hurt::cat(r.health); break;
         case Guarded::Blocked:
-            if (auto health = wcmods::cat().health()) *health.value = static_cast<float>(std::max(1.0, *health.value - r.health));
             if (stamina) *stamina.value = static_cast<float>(std::max(0.0, *stamina.value - r.stamina));
+            if (auto health = wcmods::cat().health())
+            {
+                if (*health.value - r.health <= 0) hurt::cat(r.health);   // the chip's enough: your cat falls
+                else *health.value = static_cast<float>(*health.value - r.health);
+            }
             wcmods::share("blocks", ++s.blocks);
             break;
         case Guarded::GuardBroken:

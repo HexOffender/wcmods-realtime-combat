@@ -9,8 +9,8 @@
 //
 // Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp and the
 // stamina in stamina.hpp. The dodge (step 4): dodge.hpp. The animals fighting back (step 5): foes.hpp. The flask
-// (step 6): flask.hpp. Blocking and parrying (step 7): guard.hpp, with your cat's hits taken in hurt.hpp. Each runs
-// every frame while it's on.
+// (step 6): flask.hpp. Blocking and parrying (step 7): guard.hpp, with your cat's hits taken in hurt.hpp. The HUD and
+// falling (step 8): hud.hpp, fall.hpp. Each runs every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -26,8 +26,10 @@
 #include "dodge.hpp"
 #include "enemies.hpp"
 #include "flask.hpp"
+#include "fall.hpp"
 #include "foes.hpp"
 #include "guard.hpp"
+#include "hud.hpp"
 #include "hurt.hpp"
 #include "game.hpp"
 #include "input.hpp"
@@ -104,6 +106,7 @@ namespace
                 rtc::flask::end();
                 rtc::blocking::clear();
                 rtc::hurt::clear();
+                rtc::hud::clear();
                 rtc::foes::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
@@ -123,12 +126,20 @@ namespace
         rtc::game::tick(dt);
         rtc::bodies::frame(dt);
         rtc::input::Pressed pressed = rtc::input::poll();
-        rtc::lockon::frame(dt, pressed);
-        rtc::hurt::frame(dt);
         using rtc::input::Action;
         auto drop = [&](std::initializer_list<Action> actions) {
             for (Action a : actions) pressed.on[static_cast<size_t>(a)] = false;
         };
+        // fallen: nothing but the fall until your cat stands at camp
+        rtc::fall::frame(dt);
+        if (rtc::fall::busy())
+        {
+            rtc::hud::frame(dt);
+            rtc::enemies::frame(dt);
+            return;
+        }
+        rtc::lockon::frame(dt, pressed);
+        rtc::hurt::frame(dt);
         // reeling from a hit, or a parry playing: nothing starts
         if (rtc::hurt::reeling() || rtc::blocking::state().parry_left > 0)
             drop({Action::Dodge, Action::Light, Action::Heavy, Action::Lunge, Action::Drink});
@@ -155,13 +166,14 @@ namespace
         if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
         else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
         rtc::enemies::frame(dt);
+        rtc::hud::frame(dt);
     }
 
     auto page(wcmods::Ui& ui) -> void
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: lock on, attack, dodge, block and parry, drink from the flask; the animals fight back.");
+                L"Lock on, attack, dodge, block and parry, drink from the flask; the animals fight back. Fall, and your cat's back at camp.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -194,6 +206,8 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::enemies::load();
         rtc::foes::load();
         rtc::flask::load();
+        rtc::hurt::state().on_fall = [] { rtc::fall::begin(); };
+        rtc::fall::state().end_fights = [] { rtc::foes::clear(); };
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();

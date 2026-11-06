@@ -1,0 +1,206 @@
+// hud.hpp: step 8, the HUD. On the game's own HUD (its CanvasExploration layer, so it goes when the game's menus and
+// fights hide the HUD):
+//   - a health bar over every animal your cat's hit, at its head on screen; the one locked on to gets a bigger bar
+//     with its name and level over it;
+//   - your cat's stamina, a bar under the game's health bar, and the flask's drinks under that.
+// Sizes are the game's UI units (laid out for 3840 by 2160). Everything's made once and moved each frame; the HUD's
+// looked for again twice a second (the game makes a new one after a fight or a new area).
+//
+// Shared for tests: "bars" (how many animal bars show), "target_bar" (true while the target's big bar shows).
+#pragma once
+
+#include <WCMods/WCMods.hpp>
+
+#include <format>
+#include <map>
+#include <string>
+
+#include "enemies.hpp"
+#include "flask.hpp"
+#include "game.hpp"
+#include "lockon.hpp"
+
+namespace rtc::hud
+{
+    using wcmods::UObject;
+    using wcmods::Widget;
+
+    struct Bar
+    {
+        Widget bar, name;
+        bool big = false;
+    };
+    struct State
+    {
+        Widget canvas;
+        double look = 0;
+        Widget stamina, flask;
+        std::map<UObject*, Bar> bars;
+        int shown = -1;
+        bool target_shown = false;
+    };
+    inline auto state() -> State&
+    {
+        static State s;
+        return s;
+    }
+
+    // "SK_Rabbit" -> "Rabbit", "SK_Mice" -> "Mouse".
+    inline auto display_name(std::wstring model) -> std::wstring
+    {
+        if (model.rfind(L"SK_", 0) == 0) model = model.substr(3);
+        if (model == L"Mice") return L"Mouse";
+        return model.empty() ? std::wstring(L"Animal") : model;
+    }
+
+    inline auto place(Widget& w, double x, double y, double ax, double ay) -> void
+    {
+        wcmods::Slot slot = w.slot();
+        slot.anchors(0, 0, 0, 0);
+        slot.alignment(ax, ay);
+        slot.position(x, y);
+    }
+
+    inline auto make_bar(bool big) -> Bar
+    {
+        State& s = state();
+        Bar b;
+        b.big = big;
+        b.bar = wcmods::ui::progress(1.0, wcmods::UiColor::hex(L"#c0392b"));
+        s.canvas.add(b.bar).size(big ? 300 : 170, big ? 22 : 13);
+        b.bar.set_opacity(0.92f);
+        if (big)
+        {
+            b.name = wcmods::ui::text(L"", {.size = 30, .color = wcmods::UiColor::hex(L"#f4e3b5")});
+            s.canvas.add(b.name).auto_size(true);
+        }
+        return b;
+    }
+
+    inline auto clear_bars() -> void
+    {
+        for (auto& [animal, b] : state().bars)
+        {
+            if (b.bar) b.bar.remove();
+            if (b.name) b.name.remove();
+        }
+        state().bars.clear();
+    }
+
+    // The HUD's layer, looked for again twice a second; a new one gets everything made again.
+    inline auto find_hud(double dt) -> bool
+    {
+        State& s = state();
+        s.look -= dt;
+        if (s.look <= 0 || !s.canvas)
+        {
+            s.look = 0.5;
+            Widget hud = wcmods::ui::hud();
+            Widget layer = hud ? hud.find(L"CanvasExploration") : Widget{};
+            wcmods::share("hud", static_cast<bool>(layer));
+            if (layer && layer != s.canvas)
+            {
+                clear_bars();
+                if (s.stamina) s.stamina.remove();
+                if (s.flask) s.flask.remove();
+                s.canvas = layer;
+                s.stamina = wcmods::ui::progress(1.0, wcmods::UiColor::hex(L"#e8c547"));
+                s.canvas.add(s.stamina).size(430, 14);
+                place(s.stamina, 386, 306, 0, 0);
+                s.flask = wcmods::ui::text(L"", {.size = 28, .color = wcmods::UiColor::hex(L"#f4e3b5")});
+                s.canvas.add(s.flask).auto_size(true);
+                place(s.flask, 386, 330, 0, 0);
+            }
+        }
+        return static_cast<bool>(s.canvas);
+    }
+
+    // Every frame while real-time combat is on.
+    inline auto frame(double dt) -> void
+    {
+        State& s = state();
+        if (!find_hud(dt)) return;
+
+        if (auto st = wcmods::cat().stamina(); st && s.stamina)
+        {
+            s.stamina.set_value(*st.value / std::max(1.0f, *st.max));
+            s.stamina.show_passive();
+        }
+        if (s.flask)
+        {
+            const auto& f = flask::state();
+            // (the game's font has no diamond or circle characters: they showed as question marks)
+            const std::wstring text = std::format(L"Flask  {} / {}", f.charges, f.max);
+            if (s.flask.text() != text) s.flask.set_text(text);
+            s.flask.show_passive();
+        }
+
+        // a bar over each animal hit (or locked on to: its record made, whole, so its bar shows): made as it's first
+        // wanted, gone with it
+        UObject* target = lockon::locked();
+        if (target && !enemies::known(target) && !enemies::defeated(target)) enemies::of(target);
+        int shown = 0;
+        bool target_shown = false;
+        std::erase_if(s.bars, [](auto& e) {
+            const bool keep = game::staying(e.first) && enemies::known(e.first) && !enemies::defeated(e.first);
+            if (!keep)
+            {
+                if (e.second.bar) e.second.bar.remove();
+                if (e.second.name) e.second.name.remove();
+            }
+            return !keep;
+        });
+        for (auto& [animal, e] : enemies::state().all)
+        {
+            if (e.defeated || (e.hits == 0 && animal != target) || !game::staying(animal)) continue;
+            const bool big = animal == target;
+            auto it = s.bars.find(animal);
+            if (it != s.bars.end() && it->second.big != big)
+            {
+                if (it->second.bar) it->second.bar.remove();
+                if (it->second.name) it->second.name.remove();
+                s.bars.erase(it);
+                it = s.bars.end();
+            }
+            if (it == s.bars.end()) it = s.bars.emplace(animal, make_bar(big)).first;
+            Bar& b = it->second;
+            auto at = game::at(animal);
+            auto screen = at ? game::on_screen({at->x, at->y, at->z + 30}) : std::nullopt;
+            if (!screen)
+            {
+                b.bar.hide();
+                if (b.name) b.name.hide();
+                continue;
+            }
+            b.bar.set_value(e.max > 0 ? e.health / e.max : 0);
+            place(b.bar, screen->first, screen->second, 0.5, 1.0);
+            b.bar.show_passive();
+            ++shown;
+            if (b.name)
+            {
+                const std::wstring label = std::format(L"{}  ·  level {}", display_name(e.model), e.level);
+                if (b.name.text() != label) b.name.set_text(label);
+                place(b.name, screen->first, screen->second - 26, 0.5, 1.0);
+                b.name.show_passive();
+                target_shown = true;
+            }
+        }
+        if (shown != s.shown) wcmods::share("bars", shown);
+        if (target_shown != s.target_shown) wcmods::share("target_bar", target_shown);
+        s.shown = shown;
+        s.target_shown = target_shown;
+    }
+
+    // Real-time combat off: everything taken off the HUD.
+    inline auto clear() -> void
+    {
+        State& s = state();
+        clear_bars();
+        if (s.stamina) s.stamina.hide();
+        if (s.flask) s.flask.hide();
+        if (s.shown != 0) wcmods::share("bars", 0);
+        s.shown = 0;
+        wcmods::share("target_bar", false);
+        s.target_shown = false;
+    }
+} // namespace rtc::hud

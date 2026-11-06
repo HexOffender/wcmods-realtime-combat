@@ -88,7 +88,7 @@ buttons and shoulders are taken).
 | 5. Enemies fight back | done: #5 |
 | 6. The flask | done: #7 |
 | 7. Blocking and parrying | done: #8 |
-| 8. The HUD, and falling | |
+| 8. The HUD, and falling | done: #9 |
 | 9. The controller, settings, and the release | |
 
 ### 1. The mod, and the Sandbox gate
@@ -210,6 +210,11 @@ buttons and shoulders are taken).
 - Your cat at no health doesn't die the game's way (unknown outside a fight): the mod catches it first,
   plays `Lose`, fades out, and sends your cat back to camp (the game's own return), full health, the flask
   filled, the animals that were fighting back to roaming.
+- **Built:** the game's Return to Camp does nothing sent from a mod (tapped or held), so your cat's put at its
+  Clan's camp checkpoint (`wcmods::places()`, `Gameplay.Checkpoints.<Clan>.0`), held there until the ground has
+  loaded (up to 30 s; else back where it fell). No fade. The game's font has no diamond or circle characters, so
+  the flask shows as "Flask 3 / 3". The game has its own stamina bar too, at the bottom middle while stamina's
+  being used; the mod's sits under the health bar all the time.
 - Tests: the bars show and follow the numbers; falling sends your cat to camp, healed.
 
 ### 9. The controller, settings, and the release
@@ -223,7 +228,7 @@ buttons and shoulders are taken).
 
 - ~~Whether a pounce starts a fight while the animals ignore your cat~~: it doesn't (step 1). Step 5 checks
   it again for an animal the mod is moving (its own logic stopped).
-- What the game does with a cat at no health outside a fight (step 7; the mod steps in first either way).
+- What the game does with a cat at no health outside a fight: not found; the mod steps in first (step 8).
 - ~~Whether the game's experience can be given from C++~~: not through anything reflected (step 5); prey
   goes on the fresh-kill pile instead.
 - The game's attacks were made for staged fights: some (throws, sand, rocks) may look odd up close, and
