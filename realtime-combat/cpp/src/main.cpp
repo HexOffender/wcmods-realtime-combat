@@ -121,7 +121,7 @@ namespace
         rtc::attacks::frame(dt, pressed);
         rtc::stamina::frame(dt, rtc::attacks::busy() || rtc::dodge::busy());
         // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
-        if (!wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
+        if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
         else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
         rtc::enemies::frame(dt);
     }

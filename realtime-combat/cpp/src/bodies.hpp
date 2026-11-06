@@ -2,7 +2,7 @@
 // than blocking them, and each has an ExplorationEncounterCollision capsule that starts the game's own turn-based
 // fight when a cat overlaps it, whether or not the animal has noticed the cat (seen in game: your cat slid into a
 // rabbit that ignored it, and a fight started). So while it's on, for each animal within 5,000 units (a look once a
-// second): its encounter capsule ignores cats. And an animal in a fight with your cat (locked on to, or hit) has a
+// second): its encounter capsule ignores cats. And an animal in a fight with your cat (locked on to, or fighting) has a
 // body that blocks, so your cat bumps into it rather than passing through; the rest keep theirs, which other cats (a
 // Clan's patrols) walk through as before. Off, each is put back as it was.
 //
@@ -59,11 +59,8 @@ namespace rtc::bodies
                }).has_value();
     }
 
-    // Whether an animal's in a fight with your cat: locked on to, hit (the mod keeps its health), or fighting back.
-    inline auto fighting(UObject* animal) -> bool
-    {
-        return lockon::locked() == animal || enemies::known(animal) || foes::engaged(animal);
-    }
+    // Whether an animal's in a fight with your cat: locked on to, or fighting back (one your cat's hit joins).
+    inline auto fighting(UObject* animal) -> bool { return lockon::locked() == animal || foes::engaged(animal); }
 
     // One animal set: its encounter capsule ignoring cats; what it and its body were kept.
     inline auto take(UObject* animal) -> void

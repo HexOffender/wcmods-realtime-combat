@@ -88,6 +88,16 @@ namespace rtc::enemies
         return all.emplace(animal, e).first->second;
     }
 
+    // Forget an animal (it's gone back to roaming): whole again if it fights another time.
+    inline auto forget(UObject* animal) -> void
+    {
+        auto& all = state().all;
+        auto it = all.find(animal);
+        if (it == all.end() || it->second.defeated) return;
+        unshare(animal);
+        all.erase(it);
+    }
+
     // Whether the mod keeps a record of it (it's been hit, so it's in a fight).
     inline auto known(UObject* animal) -> bool { return state().all.contains(animal); }
 

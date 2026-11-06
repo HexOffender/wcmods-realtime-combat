@@ -45,6 +45,8 @@ namespace rtc::foes
         UObject* hurt_montage{};
         int attacks = 0, cat_hits = 0, dodged = 0, missed = 0, gave_up = 0;
         double damage_multiplier = 1;
+        bool fight_back = true;   // settings.json's "animals_fight_back"
+        double engage = 400;      // settings.json's "engage_range_m", in cm
     };
     inline auto state() -> State&
     {
@@ -57,6 +59,9 @@ namespace rtc::foes
         std::lock_guard lock(wcmods::settings_lock());
         const double m = wcmods::settings()["enemy_damage"].number(1);
         state().damage_multiplier = m >= 0 && m < 20 ? m : 1;
+        state().fight_back = wcmods::settings()["animals_fight_back"].boolean(true);
+        const double r = wcmods::settings()["engage_range_m"].number(4);
+        state().engage = (r >= 0 && r <= 30 ? r : 4) * 100;
     }
 
     inline auto share_state(UObject* animal, const Foe& f) -> void
@@ -91,8 +96,8 @@ namespace rtc::foes
         if (game::staying(animal))
         {
             if (it->second.montage && game::montage_on(animal, it->second.montage)) game::stop_montage(animal, it->second.montage, 0.2);
-            wcmods::stop_following(animal, roam);
-            if (roam) wcmods::restart_ai(animal);
+            wcmods::stop_following(animal, roam);   // roam: its tree run again
+            if (roam) enemies::forget(animal);       // and whole again, if it fights another time
         }
         wcmods::share(std::format("foe {}", game::id(animal)), wcmods::Json());
         s.all.erase(it);
@@ -108,6 +113,7 @@ namespace rtc::foes
         if (!me || !health) return;
         *health.value = static_cast<float>(std::max(1.0, *health.value - damage));
         attacks::end();
+        dodge::end();   // (past its safe moment: the hit cuts the hop short)
         s.hurt_montage = wcmods::play_montage(me, L"Animation.Combat.Hit.1.Neutral", 1.2);
         s.hurt_left = 0.45;
         wcmods::share("cat_hits", ++s.cat_hits);
@@ -157,8 +163,9 @@ namespace rtc::foes
         if (s.look <= 0)
         {
             s.look = 0.25;
-            for (const wcmods::Animal& a : game::animals(spec.engage))
-                if (!enemies::defeated(a.actor)) engage(a.actor);
+            if (s.engage > 0)
+                for (const wcmods::Animal& a : game::animals(s.engage))
+                    if (!enemies::defeated(a.actor)) engage(a.actor);
             for (UObject* hit : enemies::hit_animals())
                 if (!enemies::defeated(hit)) engage(hit);
         }
