@@ -4,6 +4,7 @@ the animal's gone or too far, and when real-time combat goes off. Two rabbits ar
 straight ahead 700 units off, one nearer (500) but 40 degrees to the right.
 
 Run as test_gate.py says."""
+import ctypes
 import os
 import sys
 import time
@@ -118,10 +119,24 @@ def test_nothing_to_lock_on_to(agent):
     assert h.get(agent, "locked") is False
 
 
-def test_the_real_key(agent):
-    """Tab, through the game's own input: locks on, and lets go."""
+def _wheel(agent, clicks):
+    """Turn the mouse wheel in the game's window (up for clicks > 0), as Windows tells a window."""
+    from wcmods.agent import window
+    hwnd = window.game_window()
+    wm_mousewheel = 0x020A
+    delta = (120 * clicks) & 0xFFFF
+    ctypes.windll.user32.PostMessageW(hwnd, wm_mousewheel, delta << 16, (400 << 16) | 400)
+
+
+def test_the_real_keys(agent):
+    """Tab and the mouse wheel, through the game's own input: Tab locks on, the wheel up moves to the one to the
+    right and down back, Tab lets go."""
     agent.key("Tab")
     h.until_value(agent, "locked", True)
     assert h.get(agent, "target") == IDS["ahead"]
+    _wheel(agent, 1)
+    h.until_value(agent, "target", IDS["right"])
+    _wheel(agent, -1)
+    h.until_value(agent, "target", IDS["ahead"])
     agent.key("Tab")
     h.until_value(agent, "locked", False)

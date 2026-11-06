@@ -40,17 +40,25 @@ namespace rtc::lockon
         return s;
     }
 
-    inline auto settings() -> LockSettings
+    // settings.json's lock-on settings, read as the game starts (load()).
+    inline auto settings() -> LockSettings&
+    {
+        static LockSettings s;
+        return s;
+    }
+    inline auto load() -> void
     {
         LockSettings s;
-        std::lock_guard lock(wcmods::settings_lock());
-        const double reach = wcmods::settings()["lock_on_reach_m"].number(15);
-        if (reach >= 3 && reach <= 60)
         {
-            s.range = reach * 100;
-            s.release_range = reach * 100 + 700;
+            std::lock_guard lock(wcmods::settings_lock());
+            const double reach = wcmods::settings()["lock_on_reach_m"].number(15);
+            if (reach >= 3 && reach <= 60)
+            {
+                s.range = reach * 100;
+                s.release_range = reach * 100 + 700;
+            }
         }
-        return s;
+        settings() = s;
     }
 
     inline auto locked() -> UObject* { return state().target; }
@@ -170,7 +178,7 @@ namespace rtc::lockon
             s.hud_check = 0.5;
             wcmods::Widget hud = wcmods::ui::hud();
             wcmods::Widget layer = hud ? hud.find(L"CanvasExploration") : wcmods::Widget{};
-            if (layer && layer != s.canvas)
+            if (layer && (layer != s.canvas || !s.marker))
             {
                 s.canvas = layer;
                 s.marker = wcmods::ui::rect(wcmods::UiColor::hex(L"#fff4d6"), 26, 26);
@@ -217,7 +225,8 @@ namespace rtc::lockon
             s.sight_check = 0.2;
             s.seen = game::can_see(s.target);
         }
-        s.unseen_for = s.seen ? 0 : s.unseen_for + dt;
+        // a long frame (a hitch, an area loading) counts as a short one: out of sight means out of sight in play
+        s.unseen_for = s.seen ? 0 : s.unseen_for + std::min(dt, 0.25);
         const LockSettings ls = settings();
         const Release r = keep_lock(false, distance(*me, *them), s.unseen_for, ls);
         if (r != Release::Keep)

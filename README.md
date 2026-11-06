@@ -15,7 +15,8 @@ play a Sandbox mode cat:
   right or left; Tab again lets go (step 2).
 
 The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
-and the lock-on's reach are in `realtime-combat/settings.json`.
+and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's
+added), read as the game starts: restart the game after changing them.
 
 ## What it needs
 

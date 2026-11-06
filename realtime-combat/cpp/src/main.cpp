@@ -86,12 +86,11 @@ namespace
         g.off = off;
     }
 
-    // Every frame: the player's actions, while it's on (keys pressed while it's off do nothing of the mod's).
+    // Every frame while it's on: the player's actions (keys aren't looked at while it's off: they'd do nothing).
     auto frame(float dt) -> void
     {
-        const rtc::input::Pressed pressed = rtc::input::poll();
         if (!gate().on || !wcmods::player()) return;
-        rtc::lockon::frame(dt, pressed);
+        rtc::lockon::frame(dt, rtc::input::poll());
     }
 
     auto page(wcmods::Ui& ui) -> void
@@ -118,6 +117,7 @@ class RealtimeCombat : public wcmods::ModBase
     {
         wcmods::log(L"loaded ({})", enabled() ? L"enabled" : L"switched off in its settings");
         rtc::input::load();
+        rtc::lockon::load();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();
