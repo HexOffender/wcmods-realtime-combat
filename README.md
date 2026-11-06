@@ -12,7 +12,10 @@ play a Sandbox mode cat:
 - the animals leave your cat alone, so no turn-based fight starts (step 1);
 - **Tab** (or the middle mouse button) locks on to the animal nearest the middle of the view, within 15 m:
   the camera turns to it and follows it, and a marker sits on it. The mouse wheel moves to the next one to the
-  right or left; Tab again lets go (step 2).
+  right or left; Tab again lets go (step 2);
+- **F** is a light attack and **G** a heavy one; F while running (Shift) is a lunge. They cost stamina, and
+  hit the animals in front of your cat; an animal's health is the mod's own, and at none left it falls and
+  is gone (step 3).
 
 The mod menu (Insert) has a Real-time combat page: whether it's on, a switch for it, and the keys. The keys
 and the lock-on's reach are in `realtime-combat/settings.json` (in wcmods' `mods/realtime-combat/` once it's

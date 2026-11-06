@@ -6,7 +6,8 @@
 // the roaming animals ignore your cat, so none chases it into a turn-based fight, and a pounce on one starts none
 // either (seen in game: six pounces with them ignoring your cat started no fight; the first without did).
 //
-// Lock-on (step 2): lockon.hpp, every frame while it's on.
+// Lock-on (step 2): lockon.hpp. Attacks (step 3): attacks.hpp, with the animals' health in enemies.hpp. Each runs
+// every frame while it's on.
 //
 // What it shares (wcmods::share), for tests and other mods to read from Lua as
 // WCModsCpp.mods["realtime-combat"].get(name): "on" (true or false) and "state" (rules.hpp's code(): "on",
@@ -17,10 +18,13 @@
 #include <mutex>
 #include <string>
 
+#include "attacks.hpp"
+#include "enemies.hpp"
 #include "game.hpp"
 #include "input.hpp"
 #include "lockon.hpp"
 #include "rules.hpp"
+#include "stamina.hpp"
 
 namespace
 {
@@ -79,6 +83,9 @@ namespace
             else
             {
                 rtc::lockon::release("off");
+                rtc::attacks::end();
+                rtc::stamina::clear();
+                rtc::enemies::clear();
                 wcmods::log(L"off ({}): the animals notice your cat again", rtc::why(off));
             }
             g.on = on;
@@ -90,14 +97,18 @@ namespace
     auto frame(float dt) -> void
     {
         if (!gate().on || !wcmods::player()) return;
-        rtc::lockon::frame(dt, rtc::input::poll());
+        const rtc::input::Pressed pressed = rtc::input::poll();
+        rtc::lockon::frame(dt, pressed);
+        rtc::attacks::frame(dt, pressed);
+        rtc::stamina::frame(dt, rtc::attacks::busy());
+        rtc::enemies::frame(dt);
     }
 
     auto page(wcmods::Ui& ui) -> void
     {
         ui.heading(L"Real-time combat");
         ui.note(L"Real-time fights in place of the game's turn-based ones, while you play a Sandbox mode cat. "
-                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one.");
+                L"Work in progress: so far the animals leave your cat alone, and you can lock on to one and attack it.");
         const Gate& g = gate();
         ui.field(L"Now", g.on ? std::wstring(L"On") : std::format(L"Off: {}", rtc::why(g.off)));
         const bool was = enabled();
@@ -107,6 +118,9 @@ namespace
         ui.field(L"Lock on", rtc::input::keys_of(rtc::input::Action::Lock));
         ui.field(L"Next target", std::format(L"{} (right), {} (left)", rtc::input::keys_of(rtc::input::Action::NextRight),
                                              rtc::input::keys_of(rtc::input::Action::NextLeft)));
+        ui.field(L"Light attack", rtc::input::keys_of(rtc::input::Action::Light) + L" (while running: a lunge)");
+        ui.field(L"Heavy attack", rtc::input::keys_of(rtc::input::Action::Heavy));
+        if (auto stamina = wcmods::cat().stamina()) ui.progress(L"Stamina", *stamina.value / std::max(1.0f, *stamina.max));
     }
 } // namespace
 
@@ -118,6 +132,8 @@ class RealtimeCombat : public wcmods::ModBase
         wcmods::log(L"loaded ({})", enabled() ? L"enabled" : L"switched off in its settings");
         rtc::input::load();
         rtc::lockon::load();
+        rtc::attacks::load();
+        rtc::enemies::load();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();

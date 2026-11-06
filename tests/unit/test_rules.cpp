@@ -172,6 +172,64 @@ static void the_camera_eases_to_the_target()
     CHECK(near(up.pitch, 15, 0.1));
 }
 
+static void attacks_are_quick_and_land_inside()
+{
+    for (auto a : {rtc::Attack::Light, rtc::Attack::Heavy, rtc::Attack::Lunge})
+    {
+        const auto& s = rtc::spec(a);
+        CHECK(s.from < s.hit && s.hit < s.to);
+        CHECK(rtc::duration(s) > 0.5 && rtc::duration(s) < 1.5);
+        CHECK(rtc::hit_at(s) > 0.2 && rtc::hit_at(s) < rtc::duration(s));
+        CHECK(rtc::chain_from(s) > rtc::hit_at(s) * 0.9);
+        CHECK(!s.tag.empty() && !s.name.empty());
+    }
+    // the light one is the quickest and cheapest; the heavy one the strongest and dearest
+    CHECK(rtc::duration(rtc::spec(rtc::Attack::Light)) < rtc::duration(rtc::spec(rtc::Attack::Heavy)));
+    CHECK(rtc::spec(rtc::Attack::Light).stamina < rtc::spec(rtc::Attack::Heavy).stamina);
+    CHECK(rtc::cat_damage(rtc::Attack::Heavy, 14) > rtc::cat_damage(rtc::Attack::Light, 14));
+    CHECK(near(rtc::cat_damage(rtc::Attack::Light, 14), 23.4));
+    CHECK(near(rtc::cat_damage(rtc::Attack::Light, 14, 2.0), 46.8));
+}
+
+static void stamina_runs_down_to_nothing()
+{
+    CHECK(rtc::can_spend(100, 12) && rtc::can_spend(6, 12));
+    CHECK(!rtc::can_spend(5.9, 12) && !rtc::can_spend(0, 12));
+    CHECK(rtc::stamina_pause > 0 && rtc::stamina_pause < 2);
+    CHECK(near(rtc::spend(100, 12), 88));
+    CHECK(near(rtc::spend(5, 12), 0));
+}
+
+static void reach_is_a_cone_in_front()
+{
+    const rtc::Vec me{0, 0, 0};
+    CHECK(rtc::in_reach(me, 0, {150, 0, 0}, 190, 60));
+    CHECK(rtc::in_reach(me, 0, {120, 100, 0}, 190, 60));     // 40 degrees right
+    CHECK(!rtc::in_reach(me, 0, {50, 150, 0}, 190, 60));     // 72 degrees right
+    CHECK(!rtc::in_reach(me, 0, {-150, 0, 0}, 190, 60));     // behind
+    CHECK(!rtc::in_reach(me, 0, {250, 0, 0}, 190, 60));      // too far
+    CHECK(!rtc::in_reach(me, 0, {100, 0, 300}, 190, 60));    // far above
+    CHECK(rtc::in_reach(me, 0, {-20, 10, 0}, 190, 60));      // right on top of your cat
+    CHECK(rtc::in_reach(me, 90, {0, 150, 0}, 190, 60));      // facing +Y
+}
+
+static void enemies_have_health_by_kind_and_level()
+{
+    CHECK(near(rtc::enemy_health(L"SK_Mice", 1), 30));
+    CHECK(near(rtc::enemy_health(L"SK_Rabbit", 6), 45 * 1.6));
+    CHECK(rtc::enemy_health(L"SK_Fox", 10) > rtc::enemy_health(L"SK_Rabbit", 10));
+    CHECK(near(rtc::enemy_health(L"SK_Something", 1), 50));
+    CHECK(near(rtc::enemy_health(L"SK_Mice", 1, 2.0), 60));
+    CHECK(rtc::level_of_kind(L"Gameplay.Combat.Generator.Fixed.Rabbit.01.L6") == 6);
+    CHECK(rtc::level_of_kind(L"Gameplay.Combat.Generator.Fixed.Fox.02.L12") == 12);
+    CHECK(!rtc::level_of_kind(L"Gameplay.Combat.Generator.Fixed.Rabbit.01"));
+    CHECK(!rtc::level_of_kind(L"x.L"));
+    CHECK(!rtc::level_of_kind(L""));
+    CHECK(near(rtc::after_hit(30, 23.4), 6.6));
+    CHECK(near(rtc::after_hit(6.6, 23.4), 0));
+    CHECK(near(rtc::after_hit(10, -5), 10));
+}
+
 int main()
 {
     gate_is_on_only_for_a_sandbox_cat_in_the_world();
@@ -182,6 +240,10 @@ int main()
     next_target_goes_to_the_side_asked();
     lock_lets_go();
     the_camera_eases_to_the_target();
+    attacks_are_quick_and_land_inside();
+    stamina_runs_down_to_nothing();
+    reach_is_a_cone_in_front();
+    enemies_have_health_by_kind_and_level();
     std::printf("%d checks, %d failed\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

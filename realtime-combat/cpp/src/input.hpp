@@ -18,6 +18,9 @@ namespace rtc::input
         Lock,
         NextRight,
         NextLeft,
+        Light,
+        Heavy,
+        Lunge,
         Count,
     };
 
@@ -35,6 +38,9 @@ namespace rtc::input
             {Action::Lock, "lock", "lock", {L"Tab", L"MiddleMouseButton"}},
             {Action::NextRight, "next_right", "next_right", {L"MouseScrollUp"}},
             {Action::NextLeft, "next_left", "next_left", {L"MouseScrollDown"}},
+            {Action::Light, "light_attack", "light", {L"F"}},
+            {Action::Heavy, "heavy_attack", "heavy", {L"G"}},
+            {Action::Lunge, "lunge", "lunge", {}},   // the light attack while running; a key of its own if the settings give one
         };
         return all;
     }

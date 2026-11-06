@@ -76,7 +76,7 @@ buttons and shoulders are taken).
 |---|---|
 | 1. The mod, and the Sandbox gate | done: #1, with Sandbox mode 0.7 (HexOffender/wcmods-sandbox#7) |
 | 2. Lock-on | done: #2 |
-| 3. Attacks, stamina and enemy health | |
+| 3. Attacks, stamina and enemy health | done: #3 |
 | 4. Dodge | |
 | 5. Enemies fight back | |
 | 6. The flask | |
@@ -114,12 +114,19 @@ buttons and shoulders are taken).
   (`JumpAttack`). Each has a stamina cost, a wind-up, a moment it lands and a recovery (in `rules.hpp`,
   set per attack after watching the animation). Your cat can't move or start another while one plays,
   except that a light attack pressed during the last part of the one before chains into it.
+- **Found:** the fights' attack animations are 4.3 s long (the cat crouches, runs in, strikes at about
+  1.5 s, walks back), so an attack plays only its strike, from about 1.0 s to 2.0 s, a little faster.
+  While one plays, the game's movement takes no push (`LaunchCharacter` does nothing), so the lunge
+  slides your cat along the ground itself (a line for walls, its height kept over the ground).
 - A hit is the animal in a cone in front of your cat within reach at the moment the attack lands. The
   damage comes from your cat's level and stats, and the animal plays a hit reaction and is pushed back.
-- An animal's health: its level (the kind's, `...L6`, or its generator's party) through the game's own
-  stats for its kind (`base + growth x level`), times a setting.
-- Stamina: the game's own, as running uses it; an attack with too little isn't made. It comes back as it
-  does in the game.
+- An animal's health: a base for its kind (by its mesh, `SK_Rabbit`...) grown 12% a level, times a
+  setting. Its level is its kind's (`...L6`) when the mod knows it, else your cat's: the game's own
+  animals carry no level outside a fight.
+- At no health it plays `Lose`, a lock on it lets go, and it's taken out of the world 4 s later (moved
+  here from step 5).
+- Stamina: the game's own, as running uses it (100, 20 a second back). An attack needs at least half
+  its cost; none comes back while it plays or for 0.6 s after.
 - Tests: an attack plays its animation, costs stamina, hits an animal in front and misses one behind;
   health goes down by the rules' amount; no stamina, no attack.
 
@@ -138,9 +145,9 @@ buttons and shoulders are taken).
   (each kind's `Gameplay.Combat.Attack.<Kind>.N`), each with a wind-up long enough to see coming. Its
   hit is a cone in front of it; it takes your cat's health and plays a hit reaction on your cat.
 - Its damage from its level, as its health is. Several can fight at once; each waits its turn a little.
-- An animal at no health plays `Lose`, is taken away, and gives what a won fight would (the game's
-  experience, if the SDK can give it; to be found), and its generator puts a new one out later. One
-  you run from (far, for long) goes back to roaming (its logic restarted).
+- An animal at no health (step 3 plays `Lose` and takes it away) gives what a won fight would (the
+  game's experience, if the SDK can give it; to be found), and its generator puts a new one out later.
+  One you run from (far, for long) goes back to roaming (its logic restarted).
 - Tests: an animal near starts fighting, its attack takes health, a dodge avoids it, it dies at no
   health and is gone, one left behind roams again.
 

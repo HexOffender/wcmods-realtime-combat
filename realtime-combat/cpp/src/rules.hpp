@@ -3,7 +3,10 @@
 #pragma once
 
 #include <algorithm>
+#include <cwctype>
 #include <cmath>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -214,4 +217,108 @@ namespace rtc
         out.pitch = pitch_now + (want_pitch - pitch_now) * k;
         return out;
     }
+
+    // ------------------------------------------------------------------------------------------- attacks
+    // Your cat's attacks are the fights' own animations, which are 4.3 s long: the cat crouches, runs in (the fights
+    // warp it to its target), strikes at about 1.5 s and walks back. A real-time attack plays only the strike, from
+    // `from` to `to` in the montage's own seconds, at `rate`; the hit lands at `hit` (seen in game: Quick Claw crouched
+    // at 1.0 s, its paw out at 1.5 s, upright again by 2.2 s).
+    enum class Attack
+    {
+        Light,
+        Heavy,
+        Lunge,
+    };
+    struct AttackSpec
+    {
+        std::string_view name;
+        std::wstring_view tag;      // the row of the cat's animation table
+        double from, to, hit, rate; // montage seconds, and its speed
+        double reach;               // how far in front a hit reaches, from your cat's middle (cm)
+        double cone;                // how wide, in degrees either side of your cat's facing
+        double stamina;             // what it costs
+        double damage;              // times the light attack's damage
+        double push;                // how hard it pushes what it hits away (cm/s)
+        double lunge;               // how fast it carries your cat forward as it strikes, for 0.3 s (cm/s, 0 for none)
+    };
+    inline auto spec(Attack a) -> const AttackSpec&
+    {
+        static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0};
+        static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0};
+        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700};
+        switch (a)
+        {
+        case Attack::Light: return light;
+        case Attack::Heavy: return heavy;
+        case Attack::Lunge: return lunge;
+        }
+        return light;
+    }
+    // In real seconds from the press: how long it lasts, when it lands, and from when another light attack pressed
+    // is kept to follow it (the last 40%).
+    inline auto duration(const AttackSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    inline auto hit_at(const AttackSpec& s) -> double { return (s.hit - s.from) / s.rate; }
+    inline auto chain_from(const AttackSpec& s) -> double { return duration(s) * 0.6; }
+
+    // Stamina, as the game keeps it (100 on a cat, 20 a second back): an attack needs at least half its cost, and takes
+    // it to 0 at worst; none comes back while it plays or for `stamina_pause` seconds after.
+    inline auto can_spend(double stamina, double cost) -> bool { return stamina >= cost * 0.5; }
+    inline auto spend(double stamina, double cost) -> double { return std::max(0.0, stamina - cost); }
+    constexpr double stamina_pause = 0.6;
+
+    // Whether a place is within an attack's reach: close enough (flat distance) and in the cone in front, and not far
+    // above or below.
+    inline auto in_reach(Vec me, double facing_yaw, Vec them, double reach, double cone) -> bool
+    {
+        if (flat_distance(me, them) > reach || std::abs(them.z - me.z) > 150) return false;
+        if (flat_distance(me, them) < 40) return true;   // right on top of your cat
+        return std::abs(turn(facing_yaw, yaw_to(me, them))) <= cone;
+    }
+
+    // Your cat's damage: the light attack's grows with its level (23 at level 14), the others are multiples of it.
+    inline auto cat_damage(Attack a, int level, double multiplier = 1.0) -> double
+    {
+        return (8.0 + 1.1 * std::clamp(level, 1, 60)) * spec(a).damage * multiplier;
+    }
+
+    // ------------------------------------------------------------------------------------------- enemies
+    // An animal's health in a real-time fight: a base for its kind, by its mesh's name (SK_Mice, SK_Rabbit...), grown
+    // 12% a level past the first. Its level comes from its kind's tag when a mod spawned it ("...Rabbit.01.L6"), else
+    // the caller's guess (your cat's level).
+    inline auto base_health(std::wstring_view model) -> double
+    {
+        std::wstring m(model);
+        for (auto& c : m) c = static_cast<wchar_t>(std::towlower(c));
+        struct Kind
+        {
+            const wchar_t* part;
+            double health;
+        };
+        static const Kind kinds[] = {{L"mice", 30}, {L"mouse", 30}, {L"rat", 40}, {L"rabbit", 45}, {L"squirrel", 35},
+                                     {L"bird", 35}, {L"crow", 40}, {L"snake", 70}, {L"adder", 70}, {L"fox", 110},
+                                     {L"badger", 150}, {L"dog", 160}};
+        for (const Kind& k : kinds)
+            if (m.find(k.part) != std::wstring::npos) return k.health;
+        return 50;
+    }
+    inline auto enemy_health(std::wstring_view model, int level, double multiplier = 1.0) -> double
+    {
+        return base_health(model) * (1.0 + 0.12 * (std::clamp(level, 1, 60) - 1)) * multiplier;
+    }
+    // "Gameplay.Combat.Generator.Fixed.Rabbit.01.L6" -> 6; nullopt without an ".L<number>" at its end.
+    inline auto level_of_kind(std::wstring_view kind) -> std::optional<int>
+    {
+        const auto dot = kind.rfind(L".L");
+        if (dot == std::wstring_view::npos || dot + 2 >= kind.size()) return std::nullopt;
+        int n = 0;
+        for (size_t i = dot + 2; i < kind.size(); ++i)
+        {
+            if (kind[i] < L'0' || kind[i] > L'9') return std::nullopt;
+            n = n * 10 + (kind[i] - L'0');
+            if (n > 999) return std::nullopt;
+        }
+        return n;
+    }
+    // What's left after a hit, and whether that was the last of it.
+    inline auto after_hit(double health, double damage) -> double { return std::max(0.0, health - std::max(0.0, damage)); }
 } // namespace rtc
