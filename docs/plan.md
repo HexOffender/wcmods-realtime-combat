@@ -86,7 +86,7 @@ buttons and shoulders are taken).
 | 3. Attacks, stamina and enemy health | done: #3 |
 | 4. Dodge | done: #4 (with the animals' bodies, below) |
 | 5. Enemies fight back | done: #5 |
-| 6. The flask | |
+| 6. The flask | done: #7 |
 | 7. Blocking and parrying | |
 | 8. The HUD, and falling | |
 | 9. The controller, settings, and the release | |
@@ -183,8 +183,10 @@ buttons and shoulders are taken).
   most, a setting) over a second. It has charges (3, a setting); a hit while drinking stops it and the
   charge is spent. The charges fill again at camp (the game's return to camp, sleeping in the den) and
   when your cat falls.
-- It's not an item in the inventory: the charges are the mod's, kept per sandbox cat in a file of its own
-  beside the save.
+- It's not an item in the inventory: the charges are the mod's. (Built: they fill whenever your cat comes into
+  the forest, so they needn't be kept in a file; the game has no drinking animation, so its sniff stands in;
+  "back to camp" is any travel, a jump farther in a frame than running could make, which the game's Return to
+  Camp is.)
 - Tests: drinking heals by the right amount and spends a charge, none left does nothing, a hit stops it,
   the charges fill at camp.
 

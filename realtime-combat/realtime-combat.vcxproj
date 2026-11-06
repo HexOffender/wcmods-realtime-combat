@@ -111,6 +111,7 @@
     <ClInclude Include="cpp\src\bodies.hpp" />
     <ClInclude Include="cpp\src\dodge.hpp" />
     <ClInclude Include="cpp\src\enemies.hpp" />
+    <ClInclude Include="cpp\src\flask.hpp" />
     <ClInclude Include="cpp\src\foes.hpp" />
     <ClInclude Include="cpp\src\game.hpp" />
     <ClInclude Include="cpp\src\input.hpp" />
