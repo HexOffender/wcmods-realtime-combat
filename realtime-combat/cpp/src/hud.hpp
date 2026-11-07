@@ -1,8 +1,9 @@
 // hud.hpp: step 8, the HUD. On the game's own HUD (its CanvasExploration layer, so it goes when the game's menus and
 // fights hide the HUD):
 //   - a health bar over every animal your cat's hit, at its head on screen; the one locked on to gets a bigger bar
-//     with its name and level over it;
-//   - your cat's stamina, a bar under the game's health bar, and the flask's drinks under that.
+//     with its name and level over it, and its posture under it (gold: how near its guard is to breaking);
+//   - the flask's drinks under the game's health bar, one pip each, lit for those left. (Your cat's stamina is the
+//     game's own bar at the bottom of the screen.)
 // Sizes are the game's UI units (laid out for 3840 by 2160). Everything's made once and moved each frame; the HUD's
 // looked for again twice a second (the game makes a new one after a fight or a new area).
 //
@@ -14,9 +15,11 @@
 #include <format>
 #include <map>
 #include <string>
+#include <vector>
 
 #include "enemies.hpp"
 #include "flask.hpp"
+#include "foes.hpp"
 #include "game.hpp"
 #include "lockon.hpp"
 
@@ -27,14 +30,16 @@ namespace rtc::hud
 
     struct Bar
     {
-        Widget bar, name;
+        Widget bar, name, posture;
         bool big = false;
     };
     struct State
     {
         Widget canvas;
         double look = 0;
-        Widget stamina, flask;
+        Widget flask;                 // the flask's label
+        std::vector<Widget> pips;     // a pip a drink
+        int pips_lit = -1;
         std::map<UObject*, Bar> bars;
         int shown = -1;
         bool target_shown = false;
@@ -73,18 +78,40 @@ namespace rtc::hud
         {
             b.name = wcmods::ui::text(L"", {.size = 30, .color = wcmods::UiColor::hex(L"#f4e3b5")});
             s.canvas.add(b.name).auto_size(true);
+            b.posture = wcmods::ui::progress(0.0, wcmods::UiColor::hex(L"#e8c547"));
+            s.canvas.add(b.posture).size(300, 8);
+            b.posture.set_opacity(0.92f);
         }
         return b;
     }
 
+    inline auto remove_bar(Bar& b) -> void
+    {
+        if (b.bar) b.bar.remove();
+        if (b.name) b.name.remove();
+        if (b.posture) b.posture.remove();
+    }
+
     inline auto clear_bars() -> void
     {
-        for (auto& [animal, b] : state().bars)
-        {
-            if (b.bar) b.bar.remove();
-            if (b.name) b.name.remove();
-        }
+        for (auto& [animal, b] : state().bars) remove_bar(b);
         state().bars.clear();
+    }
+
+    // The flask's pips: one a drink, made again when the most changes.
+    inline auto make_pips(int count) -> void
+    {
+        State& s = state();
+        for (Widget& p : s.pips) p.remove();
+        s.pips.clear();
+        s.pips_lit = -1;
+        for (int i = 0; i < count; ++i)
+        {
+            Widget p = wcmods::ui::rect(wcmods::UiColor::hex(L"#e9a43a"), 24, 24);
+            s.canvas.add(p).size(24, 24);
+            place(p, 496 + i * 34, 312, 0, 0);
+            s.pips.push_back(p);
+        }
     }
 
     // The HUD's layer, looked for again twice a second; a new one gets everything made again.
@@ -101,15 +128,14 @@ namespace rtc::hud
             if (layer && layer != s.canvas)
             {
                 clear_bars();
-                if (s.stamina) s.stamina.remove();
+                for (Widget& p : s.pips) p.remove();
+                s.pips.clear();
                 if (s.flask) s.flask.remove();
                 s.canvas = layer;
-                s.stamina = wcmods::ui::progress(1.0, wcmods::UiColor::hex(L"#e8c547"));
-                s.canvas.add(s.stamina).size(430, 14);
-                place(s.stamina, 386, 306, 0, 0);
-                s.flask = wcmods::ui::text(L"", {.size = 28, .color = wcmods::UiColor::hex(L"#f4e3b5")});
+                s.flask = wcmods::ui::text(L"Flask", {.size = 28, .color = wcmods::UiColor::hex(L"#f4e3b5")});
                 s.canvas.add(s.flask).auto_size(true);
-                place(s.flask, 386, 330, 0, 0);
+                place(s.flask, 386, 306, 0, 0);
+                make_pips(flask::state().max);
             }
         }
         return static_cast<bool>(s.canvas);
@@ -121,18 +147,19 @@ namespace rtc::hud
         State& s = state();
         if (!find_hud(dt)) return;
 
-        if (auto st = wcmods::cat().stamina(); st && s.stamina)
-        {
-            s.stamina.set_value(*st.value / std::max(1.0f, *st.max));
-            s.stamina.show_passive();
-        }
         if (s.flask)
         {
             const auto& f = flask::state();
-            // (the game's font has no diamond or circle characters: they showed as question marks)
-            const std::wstring text = std::format(L"Flask  {} / {}", f.charges, f.max);
-            if (s.flask.text() != text) s.flask.set_text(text);
+            // pips, not characters: the game's font has no diamond or circle (they showed as question marks)
+            if (static_cast<int>(s.pips.size()) != f.max) make_pips(f.max);
+            if (f.charges != s.pips_lit)
+            {
+                for (int i = 0; i < static_cast<int>(s.pips.size()); ++i) s.pips[i].set_opacity(i < f.charges ? 0.95f : 0.22f);
+                s.pips_lit = f.charges;
+                wcmods::share("flask_pips", f.charges);
+            }
             s.flask.show_passive();
+            for (Widget& p : s.pips) p.show_passive();
         }
 
         // a bar over each animal hit (or locked on to: its record made, whole, so its bar shows): made as it's first
@@ -143,11 +170,7 @@ namespace rtc::hud
         bool target_shown = false;
         std::erase_if(s.bars, [](auto& e) {
             const bool keep = game::staying(e.first) && enemies::known(e.first) && !enemies::defeated(e.first);
-            if (!keep)
-            {
-                if (e.second.bar) e.second.bar.remove();
-                if (e.second.name) e.second.name.remove();
-            }
+            if (!keep) remove_bar(e.second);
             return !keep;
         });
         for (auto& [animal, e] : enemies::state().all)
@@ -157,8 +180,7 @@ namespace rtc::hud
             auto it = s.bars.find(animal);
             if (it != s.bars.end() && it->second.big != big)
             {
-                if (it->second.bar) it->second.bar.remove();
-                if (it->second.name) it->second.name.remove();
+                remove_bar(it->second);
                 s.bars.erase(it);
                 it = s.bars.end();
             }
@@ -170,6 +192,7 @@ namespace rtc::hud
             {
                 b.bar.hide();
                 if (b.name) b.name.hide();
+                if (b.posture) b.posture.hide();
                 continue;
             }
             b.bar.set_value(e.max > 0 ? e.health / e.max : 0);
@@ -184,6 +207,16 @@ namespace rtc::hud
                 b.name.show_passive();
                 target_shown = true;
             }
+            if (b.posture)
+            {
+                // under its health: how near its guard is to breaking (none for an animal not fighting)
+                const double p = foes::posture(animal).value_or(0);
+                b.posture.set_value(p);
+                place(b.posture, screen->first, screen->second + 4, 0.5, 0.0);
+                if (p > 0.01) b.posture.show_passive();
+                else b.posture.hide();
+                wcmods::share("target_posture", p);
+            }
         }
         if (shown != s.shown) wcmods::share("bars", shown);
         if (target_shown != s.target_shown) wcmods::share("target_bar", target_shown);
@@ -196,8 +229,8 @@ namespace rtc::hud
     {
         State& s = state();
         clear_bars();
-        if (s.stamina) s.stamina.hide();
         if (s.flask) s.flask.hide();
+        for (Widget& p : s.pips) p.hide();
         if (s.shown != 0) wcmods::share("bars", 0);
         s.shown = 0;
         wcmods::share("target_bar", false);

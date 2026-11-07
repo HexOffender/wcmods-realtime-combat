@@ -5,7 +5,8 @@
   "author": "HexOffender",
   "enabled": true,
   "game_builds": [
-    26337109
+    26337109,
+    26391405
   ],
   "requires": [
     "sandbox"

@@ -362,6 +362,17 @@ namespace rtc::game
         });
     }
 
+    // A montage's speed as it plays (0 holds it where it is; its own rate plays it on).
+    inline auto set_montage_rate(UObject* actor, UObject* montage, double rate) -> void
+    {
+        UObject* a = anim(actor);
+        if (!a || !montage) return;
+        wcmods::call_reflected(a, STR("Montage_SetPlayRate"), [&](wcmods::Params& p) {
+            p.set_nth(0, wcmods::Value::of(montage));
+            p.set_nth(1, wcmods::Value::of(rate));
+        });
+    }
+
     // Whether this montage still plays on the actor.
     inline auto montage_on(UObject* actor, UObject* montage) -> bool
     {

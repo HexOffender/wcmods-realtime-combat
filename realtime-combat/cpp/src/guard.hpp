@@ -109,7 +109,7 @@ namespace rtc::blocking
             if (auto health = wcmods::cat().health())
             {
                 if (*health.value - r.health <= 0) hurt::cat(r.health);   // the chip's enough: your cat falls
-                else *health.value = static_cast<float>(*health.value - r.health);
+                else wcmods::cat().set_health(*health.value - r.health);
             }
             wcmods::share("blocks", ++s.blocks);
             break;

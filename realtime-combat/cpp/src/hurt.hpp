@@ -43,7 +43,7 @@ namespace rtc::hurt
         auto health = wcmods::cat().health();
         if (!me || !health) return;
         const bool down = damage > 0 && *health.value - damage <= 0;
-        if (damage > 0) *health.value = static_cast<float>(std::max(1.0, *health.value - damage));
+        if (damage > 0) wcmods::cat().set_health(std::max(1.0, *health.value - damage));   // the HUD's bar follows
         if (down && s.on_fall)
         {
             wcmods::share("cat_hits", ++s.hits);

@@ -97,7 +97,7 @@ namespace rtc::fall
         State& s = state();
         s.falling = false;
         wcmods::share("falling", false);
-        if (auto health = wcmods::cat().health()) *health.value = *health.max;
+        wcmods::cat().heal();   // and the HUD's bar
         if (auto stamina = wcmods::cat().stamina()) *stamina.value = *stamina.max;
         flask::refill(L"back at camp");
         (void)me;
@@ -116,7 +116,7 @@ namespace rtc::fall
         {
             s.put = true;
             s.camp = camp();
-            if (auto health = wcmods::cat().health()) *health.value = *health.max;
+            wcmods::cat().heal();   // and the HUD's bar
             game::stop_montage(me, nullptr, 0.2);
             if (!s.camp)
             {

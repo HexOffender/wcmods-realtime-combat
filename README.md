@@ -24,22 +24,31 @@ notice your cat, it pounces on one, or walks into one. Instead:
 | **Block**, held; raised just before a hit lands: **parry** | Right mouse button | LB |
 | **Drink** from the flask | Z | D-pad up |
 
-- **Stamina** is the game's own. Attacks, dodges and blocked hits spend it, and none comes back while you
-  act or for a moment after. An action needs at least half its cost. It shows as a gold bar under your cat's
-  health bar.
+- **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
+  it, and none comes back while you act or for a moment after. An action needs at least half its cost.
 - **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge.
 - **Attacking:** a hit lands on every animal in front of your cat that it can see. A light attack pressed
   as one lands follows it.
-- **The animals fight back.** One within 4 m, or one you hit, comes after your cat and attacks with its own
-  animations. They attack one at a time, each with a wind-up you can see coming. Hit one in its wind-up and
-  it reels. Its health is the mod's own, and a bar shows over it once you've hit it. The one you're locked on
-  to gets a bigger bar with its name and level. Lead one 20 m from where it joined and it goes back to
-  roaming.
+- **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
+  cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
+  in with a wind-up you can see coming, and after striking it's open for a moment before it backs off again.
+  Hit one in its wind-up and it reels.
+  - **Some guard** when you attack them from in front (a badger most, a fox often): a guarded hit does a fifth
+    of its damage and fills the animal's **posture** (the gold bar under its health; a heavy attack fills it
+    twice as fast). Full, its guard breaks and it reels, open to a riposte. Keep swinging at a guard and it
+    stays up, and some strike straight back. Wait it out, or get round it.
+  - **Some hop aside** out of reach (mice, squirrels, birds, rabbits).
+  - **Some feint**, holding the wind-up a moment to bait an early dodge (snakes most), and some strike twice in
+    a row.
+  - **Prey that's losing runs**, and gets away if you let it get 18 m off.
+  - Its health is the mod's own, and a bar shows over it once you've hit it. The one you're locked on to gets a
+    bigger bar with its name and level. Lead one 20 m from where it joined and it goes back to roaming.
 - **Blocking:** a hit from in front does a quarter of its damage, and the rest comes off stamina. With too
   little stamina, the guard breaks. A **parry** takes nothing, and leaves the animal reeling and open to a
   **riposte**: your next hit on it does three times the damage.
-- **The flask** has three drinks, each giving back 40% of your cat's health over a second. A hit while
-  drinking stops it. It fills again when your cat sleeps, goes back to camp, or comes into the forest.
+- **The flask** has three drinks (the pips under your cat's health bar), each giving back 40% of your cat's
+  health over a second. A hit while drinking stops it. It fills again when your cat sleeps, goes back to camp,
+  or comes into the forest.
 - **Beaten prey** goes on your Clan's fresh-kill pile.
 - **Falling:** at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed,
   its flask full.
