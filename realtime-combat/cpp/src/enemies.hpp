@@ -31,7 +31,8 @@ namespace rtc::enemies
         std::wstring model;
         bool defeated = false;
         double gone_in = 0;   // seconds until a defeated one is taken out of the world
-        int hits = 0;         // how many times your cat's hit it
+        int hits = 0;         // how many times your cat's hit it (and your party's)
+        int your_hits = 0;    // your cat's own blows (attacks.hpp's): not the party's
         double riposte_left = 0, riposte = 1;   // parried: seconds its next hit from your cat does `riposte` times
         bool cat = false;        // one of Clan life's cats: beaten, it yields (it isn't taken away)
         int id = -1;             // Clan life's id for it
@@ -136,6 +137,13 @@ namespace rtc::enemies
         if (it == all.end()) return;
         unshare(cat);
         all.erase(it);
+    }
+
+    // One of your cat's own blows landed on it (attacks.hpp; the party's aren't counted).
+    inline auto count_yours(UObject* animal) -> void
+    {
+        auto it = state().all.find(animal);
+        if (it != state().all.end()) ++it->second.your_hits;
     }
 
     // Whether the mod keeps a record of it (it's been hit, so it's in a fight).

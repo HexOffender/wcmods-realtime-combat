@@ -2,8 +2,8 @@
 // names of the clanmates with you ("ClanLife.party"); while a fight is on (an animal or a cat fighting your cat, or hit
 // by it, within 25 m), this mod takes them over from Clan life (they're in "RealtimeCombat.fighting" then: cats.hpp
 // shares it) and drives them:
-//   - each goes after a foe: the one you're locked on to, else the one nearest it; never a cat of its own Clan (against
-//     those it stands back, near you)
+//   - each goes after a foe: the one you're locked on to, else the one nearest it; never a kit, a medicine cat or a cat
+//     of its own Clan (against those it stands back, near you)
 //   - it walks to its foe; when that gets it no nearer (no way there on the cats' walking mesh: a rabbit on a ledge), it
 //     runs straight at it (swept, stopping at whatever's in the way)
 //   - in reach, it strikes with the cats' quick claw (rules.hpp's cat_foe_spec), a cat's pace between strikes; the blow
@@ -213,7 +213,13 @@ namespace rtc::allies
     // Its foe: the one you're locked on to, else the one nearest it; none of its own Clan.
     inline auto pick(UObject* a, const Ally& ally, const std::vector<UObject*>& foes) -> UObject*
     {
-        auto allowed = [&](UObject* f) { return ally.clan.empty() || !wcmods::has_tag(f, L"ClanLife." + ally.clan); };
+        // never a kit or a medicine cat, nor a cat of its own Clan
+        auto allowed = [&](UObject* f) {
+            if (!game::clan_cat(f)) return true;
+            const std::wstring model = cat_model(game::cat_tag(f, L"ClanLife.rank."));
+            if (model == L"cat kit" || model == L"cat medicine") return false;
+            return ally.clan.empty() || !wcmods::has_tag(f, L"ClanLife." + ally.clan);
+        };
         UObject* locked = lockon::locked();
         if (locked && std::find(foes.begin(), foes.end(), locked) != foes.end() && allowed(locked)) return locked;
         auto me = game::at(a);
