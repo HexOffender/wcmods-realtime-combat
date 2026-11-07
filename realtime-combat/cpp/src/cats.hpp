@@ -46,6 +46,7 @@ namespace rtc::cats
         double publish = 0;                // seconds to sharing who's fighting again
         std::wstring fighting_last;
         std::set<UObject*> told_fought;    // cats whose fight with your cat Clan life has heard of
+        bool hinted = false;               // the killing blow's hint showing
     };
     inline auto state() -> State&
     {
@@ -171,11 +172,10 @@ namespace rtc::cats
         for (UObject* c : done) s.down.erase(c);
         if (!done.empty()) wcmods::share("yielded", static_cast<double>(s.down.size()));
         // what's shown: a hint by a yielded cat in reach
-        static bool hinted = false;
         const bool hint = in_reach() != nullptr;
-        if (hint != hinted)
+        if (hint != s.hinted)
         {
-            hinted = hint;
+            s.hinted = hint;
             if (hint)
                 wcmods::hud_objective({.title = L"Yielded", .activity = L"H (d-pad down): the killing blow. Walk away: spare them."});
             else wcmods::hide_objective();
@@ -198,14 +198,24 @@ namespace rtc::cats
         }
     }
 
-    // Real-time combat off: every cat down spared, nobody fighting.
+    // Real-time combat off: every cat down spared (one given the killing blow killed), nobody fighting.
     inline auto clear() -> void
     {
         State& s = state();
         for (auto& [cat, d] : s.down)
-            if (!d.killing && game::staying(cat)) spare(cat, d);
+        {
+            if (!game::staying(cat)) continue;
+            if (!d.killing) spare(cat, d);
+            else
+            {
+                wcmods::set_pose(cat, wcmods::Pose::Still);
+                tell("killed", d.id, d.name);
+            }
+        }
         s.down.clear();
+        s.told_fought.clear();
         s.fighting_last.clear();
+        s.hinted = false;
         wcmods::share("RealtimeCombat.fighting", wcmods::Json::array());
         wcmods::hide_objective();
     }

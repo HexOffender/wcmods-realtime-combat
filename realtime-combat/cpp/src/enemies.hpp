@@ -15,10 +15,9 @@
 #include <map>
 #include <string>
 #include <vector>
-
-#include "game.hpp"
 #include <functional>
 
+#include "game.hpp"
 #include "rules.hpp"
 
 namespace rtc::enemies
