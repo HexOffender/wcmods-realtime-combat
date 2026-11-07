@@ -161,12 +161,14 @@ def test_one_attacks_at_a_time(agent):
 
 
 def test_a_hit_in_its_windup_makes_it_reel(agent):
-    """Your cat's light attack landing in its wind-up: it reels, and its attack doesn't land."""
+    """Your cat's light attack landing in its wind-up: it reels, and its attack doesn't land. (It feints here, so its
+    wind-up is long enough for the agent's round trips.)"""
+    _rolls(agent, 0.0)
     _lock(agent)
     _until_foe(agent, "near", "windup", 12)
     _step_in(agent, "near", 140)
     hits = h.get(agent, "cat_hits") or 0
-    h.action(agent, "light")             # lands 0.38 s in; its attack lands 0.75 s in
+    h.action(agent, "light")             # lands 0.38 s in; its attack, held 0.3 s, lands 1.05 s in
     _until_foe(agent, "near", "reel", 1.5)
     time.sleep(0.6)
     assert (h.get(agent, "cat_hits") or 0) == hits, "its attack landed though it reeled"
@@ -174,25 +176,27 @@ def test_a_hit_in_its_windup_makes_it_reel(agent):
 
 def test_it_guards_and_its_guard_breaks(agent):
     """Attacked while it paces, it guards: a light hit from in front does a fifth of its damage and fills its posture;
-    a heavy one fills it the rest of the way, the guard breaks, and your cat's next hit is a riposte (three times)."""
+    a heavy one straight after (its guard held up while it's attacked) fills it the rest of the way, the guard breaks
+    and nothing gets through; your cat's next hit is a riposte (three times)."""
     _rolls(agent, 0.0)   # it guards (and feints when it attacks, and its cooldown's short)
     _lock(agent)
     _until_foe(agent, "near", "pace", 8)
     _step_in(agent, "near", 150)
     agent.lua("Game.cat():setStamina(100) return true")
-    blocked, hp = h.get(agent, "blocked_hits") or 0, _hp(agent, "near")
+    blocked, broken, hp = h.get(agent, "blocked_hits") or 0, h.get(agent, "broken_guards") or 0, _hp(agent, "near")
+    ripostes = h.get(agent, "ripostes") or 0
     h.action(agent, "light")
-    _until_foe(agent, "near", "guard", 1)
-    h.until(agent, f'({h.MOD}.get("blocked_hits") or 0) > {blocked}', 2, "the light hit to be blocked")
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the light attack to end")
+    h.action(agent, "heavy")             # at once, as a player chains them: its guard's still up
+    try:
+        h.until(agent, f'({h.MOD}.get("broken_guards") or 0) > {broken}', 2, "the heavy hit to break its guard")
+    except AssertionError:
+        raise AssertionError(f"no broken guard: it's {_foe(agent, 'near')!r}, {_distance(agent, 'near'):.0f} cm off; "
+                             f"blocked {h.get(agent, 'blocked_hits')} (from {blocked}), posture {h.get(agent, 'target_posture')}")
+    assert (h.get(agent, "blocked_hits") or 0) == blocked + 1, "the light hit wasn't blocked"
     light = agent.lua(f"return {LIGHT}")
     took = hp - _hp(agent, "near")
-    assert abs(took - light * 0.2) < 0.6, f"the guarded light hit did {took:.1f}, not a fifth of {light:.1f}"
-    assert 0 < (h.get(agent, "target_posture") or 0) < 1
-    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the light attack to end")
-    broken, ripostes = h.get(agent, "broken_guards") or 0, h.get(agent, "ripostes") or 0
-    agent.lua("Game.cat():setStamina(100) return true")
-    h.action(agent, "heavy")
-    h.until(agent, f'({h.MOD}.get("broken_guards") or 0) > {broken}', 2, "the heavy hit to break its guard")
+    assert abs(took - light * 0.2) < 0.6, f"it took {took:.1f}, not a fifth of a light hit ({light:.1f}) and nothing of the heavy"
     assert _foe(agent, "near") == "reel"
     h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the heavy attack to end")
     agent.lua("Game.cat():setStamina(100) return true")

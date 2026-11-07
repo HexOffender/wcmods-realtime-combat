@@ -598,7 +598,8 @@ namespace rtc
         double strike_at = 0;  // this wind-up lands this long after it starts
         double hold = 0;       // and is held this long first (a feint), from hold_at
         double hold_at = 0;
-        bool held = false;     // the hold has begun
+        bool held = false;     // the hold has begun,
+        bool released = false; // and ended
         bool quick = false;    // this wind-up is a combo's second strike or a counter
         double posture = 0;    // filled by guarded hits; full, its guard breaks
         double guard_for = 0;
@@ -631,6 +632,7 @@ namespace rtc
         f.hold = quick ? 0 : std::max(0.0, hold);
         f.hold_at = commit_at(s);
         f.held = false;
+        f.released = false;
         f.strike_at = quick ? s.quick : hit_at(s) + f.hold;
     }
     // One step: `dt` seconds, your cat `distance` away, the animal `from_home` from where it joined the fight, `my_turn`
@@ -666,7 +668,7 @@ namespace rtc
         switch (f.state)
         {
         case FoeState::Approach:
-            if (my_turn && f.cooldown <= 0)
+            if (my_turn && f.cooldown <= 0 && distance <= p.spacing + 150)   // near enough to rush in
             {
                 wind_up(f, s, false, roll() < p.feint ? p.feint_min + (p.feint_max - p.feint_min) * roll() : 0);
                 return FoeDo::StartAttack;
@@ -705,7 +707,11 @@ namespace rtc
                 f.held = true;
                 return FoeDo::Hold;
             }
-            if (f.hold > 0 && f.held && f.t >= f.hold_at + f.hold && f.t - dt < f.hold_at + f.hold) return FoeDo::Release;
+            if (f.hold > 0 && f.held && !f.released && f.t >= f.hold_at + f.hold)
+            {
+                f.released = true;   // once, even after a long frame that passed the whole hold
+                return FoeDo::Release;
+            }
             if (!f.landed && f.t >= f.strike_at)
             {
                 f.landed = true;

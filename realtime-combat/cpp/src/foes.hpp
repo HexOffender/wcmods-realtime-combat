@@ -27,6 +27,7 @@
 
 #include <format>
 #include <map>
+#include <optional>
 #include <random>
 
 #include "attacks.hpp"
@@ -61,6 +62,9 @@ namespace rtc::foes
         double damage_multiplier = 1;
         bool fight_back = true;   // settings.json's "animals_fight_back"
         double engage = 400;      // settings.json's "engage_range_m", in cm
+        // the tests' switches, read once a frame: every chance's roll fixed, and prey fighting on at any health
+        std::optional<double> fixed_roll;
+        bool no_flee = false;
     };
     inline auto state() -> State&
     {
@@ -71,8 +75,7 @@ namespace rtc::foes
     // A chance's roll: random, or the tests' fixed number.
     inline auto roll() -> double
     {
-        const wcmods::Json fixed = wcmods::shared("RealtimeCombat.foe_rolls");
-        if (fixed.is_number()) return std::clamp(fixed.number(), 0.0, 0.999);
+        if (state().fixed_roll) return *state().fixed_roll;
         return std::uniform_real_distribution<double>(0, 1)(state().rng);
     }
 
@@ -278,6 +281,9 @@ namespace rtc::foes
         UObject* me = wcmods::player();
         auto at_me = game::at(me);
         if (!me || !at_me) return;
+        const wcmods::Json fixed = wcmods::shared("RealtimeCombat.foe_rolls");
+        s.fixed_roll = fixed.is_number() ? std::optional<double>(std::clamp(fixed.number(), 0.0, 0.999)) : std::nullopt;
+        s.no_flee = wcmods::shared("RealtimeCombat.no_flee").boolean(false);
 
         // four times a second: animals near, and those your cat's hit, join
         s.look -= dt;
@@ -306,8 +312,7 @@ namespace rtc::foes
             if (!them) continue;
             const enemies::Enemy& rec = enemies::of(animal);
             // (RealtimeCombat.no_flee, for tests: prey fights on whatever its health)
-            const bool no_flee = wcmods::shared("RealtimeCombat.no_flee").boolean(false);
-            const double health = rec.max > 0 && !no_flee ? rec.health / rec.max : 1;
+            const double health = rec.max > 0 && !s.no_flee ? rec.health / rec.max : 1;
             const double dist = distance(*at_me, *them);
             const FoeState before = e.foe.state;
             const bool my_turn = !someone_attacking || attacking(e.foe);

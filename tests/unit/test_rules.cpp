@@ -307,6 +307,9 @@ static void foes_hit_back()
     CHECK(rtc::step(f, s, plain, 2.0, 250, 0, true, 1, r) == rtc::FoeDo::Nothing);   // cooling down
     // left too far behind while pacing: it closes in again
     CHECK(rtc::step(f, s, plain, 0.1, 600, 0, false, 1, r) == rtc::FoeDo::Approach && f.state == rtc::FoeState::Approach);
+    // still far while closing in: it doesn't attack from there, whatever its cooldown
+    rtc::Foe far_off;
+    CHECK(rtc::step(far_off, s, plain, 0.1, 900, 0, true, 1, r) == rtc::FoeDo::Nothing && far_off.state == rtc::FoeState::Approach);
     // not its turn: it waits
     rtc::Foe g;
     CHECK(rtc::step(g, s, plain, 0.1, 250, 0, false, 1, r) != rtc::FoeDo::StartAttack);
@@ -332,6 +335,11 @@ static void foes_hit_back()
     CHECK(rtc::step(fe, s, feinter, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);
     CHECK(rtc::step(fe, s, feinter, 0.35, 150, 0, true, 1, r) == rtc::FoeDo::Release);
     CHECK(rtc::step(fe, s, feinter, s.commit, 150, 0, true, 1, r) == rtc::FoeDo::Land);
+    // a long frame that passes the whole hold: Hold, then Release on the next frame all the same
+    rtc::Foe slow;
+    rtc::wind_up(slow, s, false, 0.6);
+    CHECK(rtc::step(slow, s, feinter, rtc::commit_at(s) + 0.7, 150, 0, true, 1, r) == rtc::FoeDo::Hold);
+    CHECK(rtc::step(slow, s, feinter, 0.01, 150, 0, true, 1, r) == rtc::FoeDo::Release);
 
     // a combo: a second, quick strike straight after the first, and no third
     rtc::FoeProfile comboer = plain;
