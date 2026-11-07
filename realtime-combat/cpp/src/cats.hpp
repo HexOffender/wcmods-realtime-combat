@@ -5,9 +5,11 @@
 // it: Part E); walking away (7 m), or leaving it be a while, spares it.
 //
 // Clan life hears it all through two shared values:
-//   RealtimeCombat.fighting    the names of the cats in a fight with your cat or yielded to it (Clan life leaves them be)
+//   RealtimeCombat.fighting    the names of the cats in a fight with your cat or yielded to it, and of your party's cats
+//                              fighting beside it (allies.hpp) (Clan life leaves them be)
 //   RealtimeCombat.cat_events  the last 30 things that happened, each {n (counting up), what ("fought", "yielded",
-//                              "spared", "killed"), id (Clan life's id for the cat), name}
+//                              "spared", "killed"; for your party's cats "fought_beside", "fell_beside"), id (Clan
+//                              life's id for the cat), name}
 // Shared for tests too: "cat_events" (how many), "yielded" (how many cats are down now).
 #pragma once
 
@@ -19,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "allies.hpp"
 #include "enemies.hpp"
 #include "foes.hpp"
 #include "game.hpp"
@@ -190,6 +193,7 @@ namespace rtc::cats
             for (auto& [cat, e] : foes::state().all)
                 if (game::clan_cat(cat)) names.push(wcmods::Json(wcmods::utf8(wcmods::name(cat)))), all += wcmods::name(cat);
             for (auto& [cat, d] : s.down) names.push(wcmods::Json(wcmods::utf8(wcmods::name(cat)))), all += wcmods::name(cat);
+            for (UObject* cat : allies::in_fight()) names.push(wcmods::Json(wcmods::utf8(wcmods::name(cat)))), all += wcmods::name(cat);
             if (all != s.fighting_last)
             {
                 s.fighting_last = all;
@@ -224,5 +228,7 @@ namespace rtc::cats
     inline auto hook() -> void
     {
         enemies::state().on_yield = [](UObject* cat, const enemies::Enemy& e) { yielded(cat, e); };
+        allies::state().tell = [](const char* what, int id, const std::wstring& name) { tell(what, id, name); };
+        allies::hook();
     }
 } // namespace rtc::cats

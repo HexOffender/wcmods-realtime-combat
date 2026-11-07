@@ -59,6 +59,15 @@ notice your cat, it pounces on one, or walks into one. Instead:
   - Beaten, a cat yields: it goes down and waits. Walk away (or leave it a while) and it's spared; H gives the
     killing blow.
   - Clan life hears of it all: who you fought, spared or killed, and who saw it. The cats remember.
+  - Your blows land on every cat and animal in front of your cat, so you can take on several at once.
+- **Your party** (the clanmates Clan life lets you ask along) fights beside you:
+  - Each goes after the foe you're locked on to, or the one nearest it, and strikes with the cats' claws. Its blows
+    go through the foes' guards, dodges and counters as yours do.
+  - It won't fight a cat of its own Clan.
+  - Your blows pass it by, but a foe's swing hurts it as it hurts you. Beaten, it goes down until the fight's over,
+    then gets up hurt.
+  - A green bar over each one shows its health while it fights.
+  - When the fight's over it follows you again, and remembers fighting beside you.
 - **Falling:** at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed,
   its flask full.
 
