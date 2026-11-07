@@ -55,7 +55,8 @@ notice your cat, it pounces on one, or walks into one. Instead:
   - Strike one and it fights back as a cat does: the cats' own claws, guards, dodges, feints, double strikes and
     counters.
   - A kit only runs, and a medicine cat barely defends itself.
-  - The others leave you alone unless Clan life sets one against you.
+  - The others leave you alone unless Clan life sets one against you: exiled, your old Clanmates come at you in
+    their camp.
   - Beaten, a cat yields: it goes down and waits. Walk away (or leave it a while) and it's spared; H gives the
     killing blow.
   - Clan life hears of it all: who you fought, spared or killed, and who saw it. The cats remember.
