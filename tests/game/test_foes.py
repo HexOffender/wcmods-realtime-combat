@@ -1,7 +1,13 @@
-"""Step 5, the animals fight back (docs/plan.md): an animal within 4 m joins the fight and comes after your cat; close,
-it attacks with its own animation, and when the attack lands your cat takes its damage, unless it's dodging (or out of
-reach). One attacks at a time. Hit in its wind-up, it reels and its attack stops. Defeated prey goes on the Clan's
-fresh-kill pile. Left far behind, it goes back to roaming; so do all of them when real-time combat goes off.
+"""The animals fight back (docs/plan.md, step 5, and the fight rework after it): an animal within 4 m joins the fight
+and comes toward your cat, to its spacing, where it paces round it; it rushes in to attack with its own animation, and
+when the attack lands your cat takes its damage, unless it's dodging (or out of reach). One attacks at a time. Hit in
+its wind-up, it reels and its attack stops. Attacked while pacing it may guard (blocked hits do a fifth of their
+damage and fill its posture; full, the guard breaks and it's open to a riposte) or hop aside, and it may feint. Prey
+that's losing runs off. Defeated prey goes on the Clan's fresh-kill pile. Left far behind, it goes back to roaming; so
+do all of them when real-time combat goes off.
+
+The chances are fixed for each test (RealtimeCombat.foe_rolls): 0.99 comes up for none of them; a rabbit guards under
+0.1, hops under 0.45 and feints under 0.15.
 
 Run as test_sandbox_gate.py says."""
 import os
@@ -14,6 +20,15 @@ import helpers as h  # noqa: E402
 PLACES = {"near": (0, 300)}
 IDS = {}
 DAMAGE = "(10 * (1 + 0.1 * (math.min(60, math.max(1, Game.cat():level())) - 1)))"   # rules.hpp's enemy_damage, a rabbit
+LIGHT = "(8 + 1.1 * math.min(60, math.max(1, Game.cat():level())))"                  # rules.hpp's cat_damage, a light attack
+
+
+def _rolls(agent, value):
+    agent.lua("WCModsCpp.share('RealtimeCombat.foe_rolls', %s) return true" % ("nil" if value is None else value))
+
+
+def _no_flee(agent, on):
+    agent.lua("WCModsCpp.share('RealtimeCombat.no_flee', %s) return true" % ("true" if on else "nil"))
 
 
 def setup(agent):
@@ -29,6 +44,8 @@ def setup(agent):
 
 def teardown(agent):
     h.passive(agent, True)
+    _rolls(agent, 0.99)
+    _no_flee(agent, True)
     if h.get(agent, "locked"):
         h.action(agent, "lock")
     h.clear_scene(agent)
@@ -40,17 +57,22 @@ def _foe(agent, name):
     return h.get(agent, f"foe {IDS[name]}")
 
 
-def _until_foe(agent, name, state, timeout):
+def _until_foe(agent, name, states, timeout):
+    states = (states,) if isinstance(states, str) else tuple(states)
     end = time.time() + timeout
     while time.time() < end:
-        if _foe(agent, name) == state:
+        if _foe(agent, name) in states:
             return
         time.sleep(0.04)
-    raise AssertionError(f"the {name} rabbit never got to {state!r} in {timeout} s (it's {_foe(agent, name)!r})")
+    raise AssertionError(f"the {name} rabbit never got to {states} in {timeout} s (it's {_foe(agent, name)!r})")
 
 
 def _health(agent):
     return agent.lua("return Game.cat():health()")
+
+
+def _hp(agent, name):
+    return h.get(agent, f"hp {IDS[name]}")
 
 
 def _distance(agent, name):
@@ -58,19 +80,40 @@ def _distance(agent, name):
         return math.sqrt((a.X - me.X)^2 + (a.Y - me.Y)^2)""")
 
 
-def test_joins_and_comes_close(agent):
-    """Within 4 m, it joins the fight and comes up to your cat."""
+def _lock(agent):
+    h.action(agent, "lock")
+    h.until_value(agent, "target", IDS["near"])
+
+
+def _step_in(agent, name, to=150):
+    """Your cat put `to` cm from it, facing it (a rabbit pacing 2.6 m off is out of a light attack's reach)."""
+    agent.lua(f"""local a, me = WCMODS_SCENE["{name}"]:K2_GetActorLocation(), Game.cat():location()
+        local d = math.sqrt((a.X - me.X)^2 + (a.Y - me.Y)^2)
+        if d > {to} then
+            local k = (d - {to}) / d
+            Game.cat():teleport(me.X + (a.X - me.X) * k, me.Y + (a.Y - me.Y) * k, me.Z)
+        end
+        return true""")
+
+
+def test_joins_and_keeps_its_distance(agent):
+    """Within 4 m, it joins the fight, comes toward your cat and paces round it at its spacing, not in its face."""
     h.until(agent, f'({h.MOD}.get("foes") or 0) >= 1', 2, "the rabbit to join the fight")
-    assert _foe(agent, "near") in ("chase", "windup"), _foe(agent, "near")
-    h.until(agent, f'(function() local a, me = WCMODS_SCENE.near:K2_GetActorLocation(), Game.cat():location() '
-                   f'return math.sqrt((a.X - me.X)^2 + (a.Y - me.Y)^2) < 200 end)()', 6, "the rabbit to come close")
+    assert _foe(agent, "near") in ("approach", "pace", "windup"), _foe(agent, "near")
+    _until_foe(agent, "near", "pace", 6)
+    seen = []
+    end = time.time() + 1.5
+    while time.time() < end and _foe(agent, "near") == "pace":
+        seen.append(_distance(agent, "near"))
+        time.sleep(0.1)
+    assert seen and min(seen) > 170 and max(seen) < 420, f"pacing at {min(seen):.0f} to {max(seen):.0f} cm"
 
 
 def test_its_attack_hurts(agent):
-    """Its attack lands on your cat for the rules' damage, and your cat plays a hit reaction."""
+    """It rushes in and its attack lands on your cat for the rules' damage, and your cat plays a hit reaction."""
     hits = h.get(agent, "cat_hits") or 0
     before = _health(agent)
-    h.until(agent, f'({h.MOD}.get("cat_hits") or 0) > {hits}', 10, "the rabbit's attack to land on your cat")
+    h.until(agent, f'({h.MOD}.get("cat_hits") or 0) > {hits}', 12, "the rabbit's attack to land on your cat")
     playing = agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
                         'return m and m:GetFName():ToString()')
     took = before - _health(agent)
@@ -79,14 +122,22 @@ def test_its_attack_hurts(agent):
     assert playing and "Hit" in playing, playing
 
 
+def test_it_backs_off_after_striking(agent):
+    """After its strike it's open a moment, then backs off to its spacing and paces again."""
+    _until_foe(agent, "near", "recover", 12)
+    _until_foe(agent, "near", "retreat", 1.5)
+    _until_foe(agent, "near", "pace", 2)
+    assert _distance(agent, "near") > 200, f"it's {_distance(agent, 'near'):.0f} cm off after backing off"
+
+
 def test_a_dodge_avoids_it(agent):
     """A dodge back as its wind-up starts: 3 m away (or still in the dodge's safe moment) when it lands, your cat takes
     nothing. (Timing a dodge for the last moment of the wind-up from here is too tight: reading the game takes a
     while.)"""
-    _until_foe(agent, "near", "windup", 10)
+    _until_foe(agent, "near", "windup", 12)
     h.action(agent, "dodge_back")
     before, hits = _health(agent), h.get(agent, "cat_hits") or 0
-    _until_foe(agent, "near", "chase", 3)
+    _until_foe(agent, "near", ("retreat", "pace", "approach"), 4)
     assert (h.get(agent, "cat_hits") or 0) == hits and _health(agent) == before, "the attack hurt your cat"
 
 
@@ -97,7 +148,7 @@ def test_one_attacks_at_a_time(agent):
     h.passive(agent, False)
     h.until(agent, f'({h.MOD}.get("foes") or 0) >= 3', 3, "all three to join")
     attacked = set()
-    end = time.time() + 9
+    end = time.time() + 14
     while time.time() < end:
         states = agent.lua("local m = " + h.MOD + " return { near = m.get('foe " + str(IDS["near"]) + "'), "
                            "left = m.get('foe " + str(IDS["left"]) + "'), right = m.get('foe " + str(IDS["right"]) + "') }")
@@ -106,14 +157,14 @@ def test_one_attacks_at_a_time(agent):
         attacked.update(busy)
         agent.lua("Game.cat():heal() return true")
         time.sleep(0.1)
-    assert len(attacked) >= 2, f"only {attacked} attacked in 9 s"
+    assert len(attacked) >= 2, f"only {attacked} attacked in 14 s"
 
 
 def test_a_hit_in_its_windup_makes_it_reel(agent):
     """Your cat's light attack landing in its wind-up: it reels, and its attack doesn't land."""
-    h.action(agent, "lock")
-    h.until_value(agent, "target", IDS["near"])
-    _until_foe(agent, "near", "windup", 10)
+    _lock(agent)
+    _until_foe(agent, "near", "windup", 12)
+    _step_in(agent, "near", 140)
     hits = h.get(agent, "cat_hits") or 0
     h.action(agent, "light")             # lands 0.38 s in; its attack lands 0.75 s in
     _until_foe(agent, "near", "reel", 1.5)
@@ -121,20 +172,94 @@ def test_a_hit_in_its_windup_makes_it_reel(agent):
     assert (h.get(agent, "cat_hits") or 0) == hits, "its attack landed though it reeled"
 
 
+def test_it_guards_and_its_guard_breaks(agent):
+    """Attacked while it paces, it guards: a light hit from in front does a fifth of its damage and fills its posture;
+    a heavy one fills it the rest of the way, the guard breaks, and your cat's next hit is a riposte (three times)."""
+    _rolls(agent, 0.0)   # it guards (and feints when it attacks, and its cooldown's short)
+    _lock(agent)
+    _until_foe(agent, "near", "pace", 8)
+    _step_in(agent, "near", 150)
+    agent.lua("Game.cat():setStamina(100) return true")
+    blocked, hp = h.get(agent, "blocked_hits") or 0, _hp(agent, "near")
+    h.action(agent, "light")
+    _until_foe(agent, "near", "guard", 1)
+    h.until(agent, f'({h.MOD}.get("blocked_hits") or 0) > {blocked}', 2, "the light hit to be blocked")
+    light = agent.lua(f"return {LIGHT}")
+    took = hp - _hp(agent, "near")
+    assert abs(took - light * 0.2) < 0.6, f"the guarded light hit did {took:.1f}, not a fifth of {light:.1f}"
+    assert 0 < (h.get(agent, "target_posture") or 0) < 1
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the light attack to end")
+    broken, ripostes = h.get(agent, "broken_guards") or 0, h.get(agent, "ripostes") or 0
+    agent.lua("Game.cat():setStamina(100) return true")
+    h.action(agent, "heavy")
+    h.until(agent, f'({h.MOD}.get("broken_guards") or 0) > {broken}', 2, "the heavy hit to break its guard")
+    assert _foe(agent, "near") == "reel"
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the heavy attack to end")
+    agent.lua("Game.cat():setStamina(100) return true")
+    _step_in(agent, "near", 140)
+    h.action(agent, "light")
+    h.until(agent, f'({h.MOD}.get("ripostes") or 0) > {ripostes}', 2, "the riposte")
+
+
+def test_it_hops_aside(agent):
+    """Attacked while it paces, it hops aside: the light attack finds nothing."""
+    _rolls(agent, 0.2)   # a hop (over its 0.1 guard chance, under 0.45), no feint
+    _lock(agent)
+    _until_foe(agent, "near", "pace", 8)
+    _step_in(agent, "near", 150)
+    hops, hp = h.get(agent, "hops") or 0, _hp(agent, "near")
+    h.action(agent, "light")
+    _until_foe(agent, "near", "hop", 1)
+    h.until(agent, f'({h.MOD}.get("hops") or 0) > {hops}', 1, "the hop")
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the light attack to end")
+    assert _hp(agent, "near") == hp, "the light attack hit it in its hop"
+
+
+def test_a_feint_holds_its_strike(agent):
+    """A feint: its wind-up is held a while, so its strike comes well after the usual 0.75 s."""
+    _rolls(agent, 0.0)   # it feints (and holds as long as the rabbit's least, 0.3 s)
+    feints = h.get(agent, "feints") or 0
+    _until_foe(agent, "near", "windup", 12)
+    started = time.time()
+    _until_foe(agent, "near", "recover", 3)
+    took = time.time() - started
+    assert (h.get(agent, "feints") or 0) > feints, "no feint"
+    assert took > 0.9, f"its strike came {took:.2f} s after its wind-up began"
+
+
+def test_losing_prey_runs(agent):
+    """A rabbit below a third of its health runs from your cat."""
+    _no_flee(agent, False)
+    _lock(agent)
+    fled = h.get(agent, "fled") or 0
+    for _ in range(12):
+        if (h.get(agent, "fled") or 0) > fled:
+            break
+        agent.lua("Game.cat():setStamina(100) Game.cat():heal() return true")
+        _step_in(agent, "near", 140)
+        h.action(agent, "heavy")
+        h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+        time.sleep(0.2)
+    assert (h.get(agent, "fled") or 0) > fled, "it never ran"
+    start = _distance(agent, "near")
+    time.sleep(1.5)
+    assert _distance(agent, "near") > start + 150, "it isn't getting away"
+
+
 def test_defeat_feeds_the_clan(agent):
     """Beaten, a rabbit goes on the fresh-kill pile (5 more), and it's let go of."""
     agent.lua("Game.freshKill.set(40) return true")
-    h.action(agent, "lock")
-    h.until_value(agent, "target", IDS["near"])
+    _lock(agent)
     defeated = h.get(agent, "defeated") or 0
-    for _ in range(10):
+    for _ in range(14):
         agent.lua("Game.cat():setStamina(100) Game.cat():heal() return true")
+        _step_in(agent, "near", 140)
         h.action(agent, "heavy")
         h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
         if (h.get(agent, "defeated") or 0) > defeated:
             break
         time.sleep(0.3)
-    assert (h.get(agent, "defeated") or 0) > defeated, "the rabbit wasn't beaten in ten heavy attacks"
+    assert (h.get(agent, "defeated") or 0) > defeated, "the rabbit wasn't beaten in fourteen heavy attacks"
     pile = agent.lua("return Game.freshKill.value()")
     assert h.get(agent, "fresh_kill_given") == 5
     assert 43.5 <= pile <= 45.5, f"the fresh-kill pile is {pile}, not 45 (or a little less: it goes down on its own)"

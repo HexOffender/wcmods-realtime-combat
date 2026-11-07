@@ -261,6 +261,7 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::flask::load();
         rtc::hurt::state().on_fall = [] { rtc::fall::begin(); };
         rtc::fall::state().end_fights = [] { rtc::foes::clear(); };
+        rtc::foes::hook();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();

@@ -160,7 +160,7 @@ namespace rtc::flask
         if (auto health = wcmods::cat().health())
         {
             const double add = healed_between(f, *health.max, before, s.elapsed);
-            if (add > 0) *health.value = static_cast<float>(std::min<double>(*health.max, *health.value + add));
+            if (add > 0) wcmods::cat().set_health(*health.value + add);   // kept within its most; the HUD's bar follows
         }
         if (s.elapsed >= duration(f)) end();
     }

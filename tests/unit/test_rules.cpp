@@ -257,60 +257,191 @@ static void the_dodge()
     CHECK(!rtc::can_dodge_out_of(light, 0.1) && rtc::can_dodge_out_of(light, rtc::hit_at(light)));
 }
 
+// Rolls for step(), react() and take_hit(): the numbers given, in turn, then 0.99 (no chance comes up).
+struct Rolls
+{
+    std::vector<double> next;
+    size_t i = 0;
+    double operator()() { return i < next.size() ? next[i++] : 0.99; }
+};
+
 static void foes_hit_back()
 {
     const rtc::FoeSpec s;
     CHECK(rtc::hit_at(s) > 0.5 && rtc::hit_at(s) < rtc::duration(s));
+    CHECK(rtc::commit_at(s) > 0 && rtc::commit_at(s) < rtc::hit_at(s));
     CHECK(near(rtc::enemy_damage(L"SK_Rabbit", 14), 23));
     CHECK(rtc::enemy_damage(L"SK_Fox", 5) > rtc::enemy_damage(L"SK_Mice", 5));
     CHECK(near(rtc::enemy_damage(L"SK_Rabbit", 1, 0.5), 5));
     CHECK(near(rtc::fresh_kill_for(L"SK_Rabbit"), 5) && near(rtc::fresh_kill_for(L"SK_Fox"), 0));
 
-    // far: it comes after your cat; close with the turn free: it attacks, lands, recovers, cools down
+    // kinds fight differently: a badger guards most and takes most to break; a mouse hops and runs; a fox mixes
+    const auto badger = rtc::profile(L"SK_Badger"), mouse = rtc::profile(L"SK_Mice"), fox = rtc::profile(L"SK_Fox");
+    CHECK(badger.guard > fox.guard && fox.guard > mouse.guard && badger.posture > fox.posture);
+    CHECK(mouse.dodge > fox.dodge && mouse.flee_below > 0 && badger.flee_below == 0);
+    CHECK(fox.combo > 0 && fox.counter > 0 && fox.feint > 0);
+    for (const auto* kind : {L"SK_Rabbit", L"SK_Rat", L"SK_Squirrel", L"SK_Bird", L"SK_Crow", L"SK_Snake", L"SK_Dog", L"SK_Thing"})
+    {
+        const auto k = rtc::profile(kind);
+        CHECK(k.guard + k.dodge <= 1 && k.spacing > k.attack_range && k.cooldown_max >= k.cooldown_min && k.posture > 0);
+    }
+    rtc::FoeProfile plain;   // no chances: every roll comes out the same way
+    plain.cooldown_min = plain.cooldown_max = 3;
+
+    // it closes in to its spacing and paces, not into your cat's face; with its cooldown done and the turn free it
+    // attacks, lands, stays open a moment, backs off and paces again, cooling down
+    Rolls r;
     rtc::Foe f;
-    CHECK(rtc::step(f, s, 0.1, 600, 0, true, 2) == rtc::FoeDo::Nothing && f.state == rtc::FoeState::Chase);
-    CHECK(rtc::step(f, s, 0.1, 120, 0, true, 2) == rtc::FoeDo::StartAttack && f.state == rtc::FoeState::WindUp);
-    CHECK(rtc::attacking(f));
-    CHECK(rtc::step(f, s, 0.5, 120, 0, true, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(f, s, 0.3, 120, 0, true, 2) == rtc::FoeDo::Land && f.state == rtc::FoeState::Recover);
-    CHECK(rtc::step(f, s, 0.1, 120, 0, true, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(f, s, 0.5, 120, 0, true, 2) == rtc::FoeDo::EndAttack && f.state == rtc::FoeState::Chase);
-    CHECK(near(f.cooldown, 2));
-    // cooling down: no attack, even close with the turn free
-    CHECK(rtc::step(f, s, 1.0, 120, 0, true, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(f, s, 1.1, 120, 0, true, 2) == rtc::FoeDo::StartAttack);
+    f.cooldown = 1;
+    CHECK(rtc::step(f, s, plain, 0.1, 900, 0, true, 1, r) == rtc::FoeDo::Nothing && f.state == rtc::FoeState::Approach);
+    CHECK(rtc::step(f, s, plain, 0.1, 280, 0, true, 1, r) == rtc::FoeDo::Pace && f.state == rtc::FoeState::Pace);
+    CHECK(rtc::step(f, s, plain, 0.5, 260, 0, true, 1, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(f, s, plain, 0.5, 260, 0, true, 1, r) == rtc::FoeDo::StartAttack && f.state == rtc::FoeState::WindUp);
+    CHECK(rtc::attacking(f) && near(f.strike_at, rtc::hit_at(s)) && near(f.hold, 0));
+    CHECK(rtc::step(f, s, plain, 0.5, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(f, s, plain, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Land && f.state == rtc::FoeState::Recover);
+    CHECK(rtc::step(f, s, plain, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);   // open: the time to hit it
+    CHECK(rtc::step(f, s, plain, 0.5, 150, 0, true, 1, r) == rtc::FoeDo::Retreat && f.state == rtc::FoeState::Retreat);
+    CHECK(near(f.cooldown, 3) && !rtc::attacking(f));
+    CHECK(rtc::step(f, s, plain, 0.6, 250, 0, true, 1, r) == rtc::FoeDo::Pace && f.state == rtc::FoeState::Pace);
+    CHECK(rtc::step(f, s, plain, 2.0, 250, 0, true, 1, r) == rtc::FoeDo::Nothing);   // cooling down
+    // left too far behind while pacing: it closes in again
+    CHECK(rtc::step(f, s, plain, 0.1, 600, 0, false, 1, r) == rtc::FoeDo::Approach && f.state == rtc::FoeState::Approach);
     // not its turn: it waits
     rtc::Foe g;
-    CHECK(rtc::step(g, s, 0.1, 120, 0, false, 2) == rtc::FoeDo::Nothing && g.state == rtc::FoeState::Chase);
-    // hit in its wind-up: it reels, then chases with a cooldown; after it's landed a hit doesn't stop it
+    CHECK(rtc::step(g, s, plain, 0.1, 250, 0, false, 1, r) != rtc::FoeDo::StartAttack);
+
+    // pacing a while, it may turn round (a roll under 0.4) or not
+    rtc::Foe pace;
+    pace.state = rtc::FoeState::Pace;
+    pace.cooldown = 99;
+    Rolls turn{{0.1}};
+    CHECK(rtc::step(pace, s, plain, s.pace_turn, 250, 0, true, 1, turn) == rtc::FoeDo::Pace && pace.side == -1);
+    CHECK(rtc::step(pace, s, plain, s.pace_turn, 250, 0, true, 1, r) == rtc::FoeDo::Nothing && pace.side == -1);
+
+    // a feint: the wind-up is held before the strike (Hold, then Release), and lands that much later
+    rtc::FoeProfile feinter = plain;
+    feinter.feint = 1;
+    feinter.feint_min = feinter.feint_max = 0.6;
+    rtc::Foe fe;
+    fe.state = rtc::FoeState::Pace;
+    Rolls fr{{0.0, 0.5}};
+    CHECK(rtc::step(fe, s, feinter, 0.1, 250, 0, true, 1, fr) == rtc::FoeDo::StartAttack);
+    CHECK(near(fe.hold, 0.6) && near(fe.strike_at, rtc::hit_at(s) + 0.6));
+    CHECK(rtc::step(fe, s, feinter, rtc::commit_at(s), 150, 0, true, 1, r) == rtc::FoeDo::Hold);
+    CHECK(rtc::step(fe, s, feinter, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(fe, s, feinter, 0.35, 150, 0, true, 1, r) == rtc::FoeDo::Release);
+    CHECK(rtc::step(fe, s, feinter, s.commit, 150, 0, true, 1, r) == rtc::FoeDo::Land);
+
+    // a combo: a second, quick strike straight after the first, and no third
+    rtc::FoeProfile comboer = plain;
+    comboer.combo = 1;
+    rtc::Foe c;
+    c.state = rtc::FoeState::Pace;
+    Rolls cr{{0.5, 0.0}};   // no feint; the combo comes up
+    CHECK(rtc::step(c, s, comboer, 0.1, 250, 0, true, 1, cr) == rtc::FoeDo::StartAttack);
+    CHECK(rtc::step(c, s, comboer, rtc::hit_at(s), 150, 0, true, 1, cr) == rtc::FoeDo::Land);
+    CHECK(rtc::step(c, s, comboer, s.combo_gap, 150, 0, true, 1, cr) == rtc::FoeDo::Combo && c.quick);
+    CHECK(rtc::step(c, s, comboer, s.quick, 150, 0, true, 1, cr) == rtc::FoeDo::Land);
+    Rolls again{{0.0}};
+    CHECK(rtc::step(c, s, comboer, s.combo_gap, 150, 0, true, 1, again) == rtc::FoeDo::Nothing && c.state == rtc::FoeState::Recover);
+
+    // your cat attacks it: pacing, it guards (a roll under its guard chance) or hops (under guard + dodge); mid-attack it
+    // can't
+    rtc::FoeProfile wary = plain;
+    wary.guard = 0.3;
+    wary.dodge = 0.3;
+    rtc::Foe w;
+    w.state = rtc::FoeState::Pace;
+    CHECK(rtc::react(w, wary, 0.1) == rtc::FoeReaction::Guard && w.state == rtc::FoeState::Guard);
+    w.t = 1.0;   // attacked again while guarding: it keeps its guard up as long again, whatever the roll
+    CHECK(rtc::react(w, wary, 0.9) == rtc::FoeReaction::KeepGuard && w.state == rtc::FoeState::Guard && near(w.t, 0));
+    w.state = rtc::FoeState::Pace;
+    CHECK(rtc::react(w, wary, 0.5) == rtc::FoeReaction::Hop && w.state == rtc::FoeState::Hop);
+    w.state = rtc::FoeState::Pace;
+    CHECK(rtc::react(w, wary, 0.7) == rtc::FoeReaction::None && w.state == rtc::FoeState::Pace);
+    rtc::wind_up(w, s, false, 0);
+    CHECK(rtc::react(w, wary, 0.0) == rtc::FoeReaction::None && w.state == rtc::FoeState::WindUp);
+
+    // a hop's first part is out of reach; after it, it's hit as usual, and paces again when it's done
     rtc::Foe h;
-    rtc::step(h, s, 0.1, 120, 0, true, 2);
-    CHECK(rtc::stagger(h, s.stagger) && h.state == rtc::FoeState::Reel && !rtc::attacking(h));
-    CHECK(rtc::step(h, s, 0.6, 120, 0, true, 2) == rtc::FoeDo::EndAttack && h.state == rtc::FoeState::Chase);
+    h.state = rtc::FoeState::Hop;
+    CHECK(rtc::take_hit(h, s, wary, true, false, 0.99).what == rtc::FoeHit::Missed);
+    h.t = s.hop_safe + 0.01;
+    CHECK(rtc::take_hit(h, s, wary, true, false, 0.99).what == rtc::FoeHit::Hit);
+    CHECK(rtc::step(h, s, wary, s.hop, 250, 0, false, 1, r) == rtc::FoeDo::Pace);
+
+    // guarding: a hit from in front does guard_chip and fills its posture (a heavy one twice); from behind it's a hit;
+    // full, the guard breaks and it reels, open; with its counter chance it strikes back at once
+    rtc::FoeProfile guarder = plain;
+    guarder.posture = 60;
+    guarder.counter = 0.5;
+    rtc::Foe gd;
+    gd.state = rtc::FoeState::Guard;
+    gd.guard_for = 5;
+    auto b = rtc::take_hit(gd, s, guarder, true, false, 0.99);
+    CHECK(b.what == rtc::FoeHit::Blocked && near(b.part, s.guard_chip) && near(gd.posture, s.posture_hit));
+    CHECK(rtc::take_hit(gd, s, guarder, false, false, 0.99).what == rtc::FoeHit::Hit && near(gd.posture, s.posture_hit));
+    auto broke = rtc::take_hit(gd, s, guarder, true, true, 0.99);   // 25 + 50 >= 60
+    CHECK(broke.what == rtc::FoeHit::Broken && near(broke.part, 0) && gd.state == rtc::FoeState::Reel);
+    CHECK(near(gd.reel_for, s.broken_for) && near(gd.posture, 0));
+    rtc::Foe ct;
+    ct.state = rtc::FoeState::Guard;
+    ct.guard_for = 5;
+    CHECK(rtc::take_hit(ct, s, guarder, true, false, 0.2).what == rtc::FoeHit::Countered && ct.state == rtc::FoeState::WindUp);
+    CHECK(ct.quick && near(ct.strike_at, s.quick));
+    // posture comes down again while it isn't guarding; a guard ends after its time
+    rtc::Foe pr;
+    pr.state = rtc::FoeState::Pace;
+    pr.cooldown = 99;
+    pr.posture = 30;
+    rtc::step(pr, s, guarder, 1.0, 250, 0, true, 1, r);
+    CHECK(near(pr.posture, 30 - s.posture_regen));
+    rtc::Foe ge;
+    ge.state = rtc::FoeState::Guard;
+    ge.guard_for = 1.2;
+    CHECK(rtc::step(ge, s, guarder, 1.3, 250, 0, true, 1, r) == rtc::FoeDo::Pace);
+
+    // hit in its wind-up: it reels, then backs off; after it's landed a hit doesn't stop it
+    rtc::Foe st;
+    rtc::wind_up(st, s, false, 0);
+    CHECK(rtc::take_hit(st, s, plain, true, false, 0.99).what == rtc::FoeHit::Staggered && st.state == rtc::FoeState::Reel);
+    CHECK(rtc::step(st, s, plain, s.stagger + 0.01, 150, 0, true, 1, r) == rtc::FoeDo::Retreat);
     rtc::Foe k;
-    rtc::step(k, s, 0.1, 120, 0, true, 2);
-    rtc::step(k, s, 0.8, 120, 0, true, 2);   // landed
-    CHECK(!rtc::stagger(k, s.stagger));
-    // parried, whatever it was doing: it reels as long as asked, then chases again
-    rtc::Foe p;
-    rtc::step(p, s, 0.1, 120, 0, true, 2);
-    rtc::step(p, s, 0.8, 120, 0, true, 2);   // landed: recovering
-    rtc::parried(p, 2.0);
-    CHECK(p.state == rtc::FoeState::Reel);
-    CHECK(rtc::step(p, s, 1.5, 120, 0, true, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(p, s, 0.6, 120, 0, true, 2) == rtc::FoeDo::EndAttack && p.state == rtc::FoeState::Chase);
-    // too far for too long: it gives up
+    rtc::wind_up(k, s, false, 0);
+    rtc::step(k, s, plain, rtc::hit_at(s), 150, 0, true, 1, r);   // landed
+    CHECK(rtc::take_hit(k, s, plain, true, false, 0.99).what == rtc::FoeHit::Hit && k.state == rtc::FoeState::Recover);
+    // parried, whatever it was doing: it reels as long as asked
+    rtc::parried(k, 2.0);
+    CHECK(k.state == rtc::FoeState::Reel);
+    CHECK(rtc::step(k, s, plain, 1.5, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(k, s, plain, 0.6, 150, 0, true, 1, r) == rtc::FoeDo::Retreat);
+
+    // prey that's losing runs for it (not mid-strike), and once far enough it's got away
+    rtc::Foe run;
+    run.state = rtc::FoeState::Pace;
+    run.cooldown = 99;
+    CHECK(rtc::step(run, s, mouse, 0.1, 250, 0, true, 0.5, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(run, s, mouse, 0.1, 250, 0, true, 0.2, r) == rtc::FoeDo::Flee && run.state == rtc::FoeState::Flee);
+    CHECK(rtc::step(run, s, mouse, 0.6, s.flee_escape + 100, 0, true, 0.2, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(run, s, mouse, 0.6, s.flee_escape + 100, 0, true, 0.2, r) == rtc::FoeDo::GiveUp);
+    rtc::Foe bite;
+    rtc::wind_up(bite, s, false, 0);
+    CHECK(rtc::step(bite, s, mouse, 0.1, 150, 0, true, 0.2, r) != rtc::FoeDo::Flee);
+    rtc::Foe stout;   // not prey: it fights on
+    CHECK(rtc::step(stout, s, badger, 0.1, 250, 0, false, 0.05, r) != rtc::FoeDo::Flee);
+
+    // too far for too long: it gives up; led too far from where it joined, too
     rtc::Foe far;
-    CHECK(rtc::step(far, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(far, s, 2, 3000, 0, true, 2) == rtc::FoeDo::GiveUp);
-    // led too far from where it joined, though it's kept up with your cat: it gives up too
+    CHECK(rtc::step(far, s, plain, 2, 3000, 0, false, 1, r) == rtc::FoeDo::Nothing);
+    CHECK(rtc::step(far, s, plain, 2, 3000, 0, false, 1, r) == rtc::FoeDo::GiveUp);
     rtc::Foe led;
-    CHECK(rtc::step(led, s, 2, 150, 2500, false, 2) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(led, s, 2, 150, 2500, false, 2) == rtc::FoeDo::GiveUp);
+    CHECK(rtc::step(led, s, plain, 2, 250, 2500, false, 1, r) != rtc::FoeDo::GiveUp);
+    CHECK(rtc::step(led, s, plain, 2, 250, 2500, false, 1, r) == rtc::FoeDo::GiveUp);
     rtc::Foe back;
-    rtc::step(back, s, 2, 3000, 0, true, 2);
-    rtc::step(back, s, 0.1, 500, 0, true, 2);   // came back near: the count starts again
-    CHECK(rtc::step(back, s, 2, 3000, 0, true, 2) == rtc::FoeDo::Nothing);
+    rtc::step(back, s, plain, 2, 3000, 0, false, 1, r);
+    rtc::step(back, s, plain, 0.1, 500, 0, false, 1, r);   // came back near: the count starts again
+    CHECK(rtc::step(back, s, plain, 2, 3000, 0, false, 1, r) != rtc::FoeDo::GiveUp);
 }
 
 // Your cat walked as the game walks it: along the camera's right (side +1) or left, at `speed`, for `seconds`, the

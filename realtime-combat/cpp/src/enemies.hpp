@@ -133,8 +133,9 @@ namespace rtc::enemies
         return it != all.end() && it->second.defeated;
     }
 
-    // A hit from your cat: health off, a hit reaction, pushed away from `from` at `push` cm/s. True when it was the last.
-    inline auto hit(UObject* animal, double damage, Vec from, double push) -> bool
+    // A hit from your cat: health off, a hit reaction (`flinch`: not through a guard), pushed away from `from` at `push`
+    // cm/s. True when it was the last.
+    inline auto hit(UObject* animal, double damage, Vec from, double push, bool flinch = true) -> bool
     {
         Enemy& e = of(animal);
         if (e.defeated) return false;
@@ -168,7 +169,7 @@ namespace rtc::enemies
             }
             return true;
         }
-        wcmods::play_montage(animal, L"Animation.Combat.Hit.1.Neutral");
+        if (flinch) wcmods::play_montage(animal, L"Animation.Combat.Hit.1.Neutral");
         if (at && push > 0)
         {
             const double yaw = yaw_to(from, *at) / degrees_per_radian;

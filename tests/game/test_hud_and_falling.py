@@ -1,5 +1,6 @@
 """Step 8, the HUD and falling (docs/plan.md): a health bar over each animal your cat's hit, the target's bigger with its
-name and level; your cat's stamina and the flask on the HUD. At no health your cat falls: its lose animation, every
+name and level (and its posture under it while it fights); a hit on your cat shown by the game's own health bar; the
+flask's drinks as pips. At no health your cat falls: its lose animation, every
 fight ended, and it's back at its Clan's camp, healed, its flask full.
 
 Run as test_sandbox_gate.py says."""
@@ -50,6 +51,23 @@ def test_bars_over_animals(agent):
     h.until_value(agent, "bars", 2)
     h.until_value(agent, "target_bar", True)
     agent.shot("hud-bars")
+
+
+def test_the_game_health_bar_and_the_flask_pips(agent):
+    """A hit on your cat shows on the game's own health bar (the mod's change to its health redraws it), and the flask's
+    pips light for the drinks it has left."""
+    h.until_value(agent, "hud", True)
+    hud_text = ('local hud = Game.find("WBP_GuiHudGameWrc_C") '
+                'return hud and hud.mcGuiHudCharacter.mcGuiTextHealth:GetText():ToString()')
+    full = agent.lua("return Game.cat():maxHealth()")
+    assert str(int(full)) in agent.lua(hud_text)
+    h.action(agent, "hurt")      # a small hit, as an animal's (5)
+    h.until(agent, f"Game.cat():health() < {full}", 2, "the hit")
+    now = agent.lua("return Game.cat():health()")
+    shown = agent.lua(hud_text)
+    assert shown and str(int(now)) in shown, shown
+    h.until(agent, f'{h.MOD}.get("flask_pips") == {h.MOD}.get("flask")', 2, "the pips to match the drinks")
+    agent.shot("hud-health-and-pips")
 
 
 def test_falling(agent):

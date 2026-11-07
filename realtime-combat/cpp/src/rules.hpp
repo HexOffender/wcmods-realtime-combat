@@ -401,24 +401,113 @@ namespace rtc
     // ------------------------------------------------------------------------------------------- the animals fight back
     // An animal's attack is its own default fight animation (Gameplay.Combat.Attack.Default, 4.3 s like your cat's: it
     // strikes at about 1.6 to 1.9 s, seen in game), played from `from` to `to`, landing at `hit`: about 0.75 s of wind-up
-    // to see it coming.
+    // to see it coming. What's the same for every animal is here; what differs by kind is its FoeProfile (below).
     struct FoeSpec
     {
         std::wstring_view tag = L"Gameplay.Combat.Attack.Default";
         double from = 1.0, to = 2.2, hit = 1.75, rate = 1.0;
         double reach = 170, cone = 60;
         double engage = 400;           // an animal this near your cat joins the fight (cm)
-        double attack_range = 150;     // close enough to start an attack
-        double follow = 110;           // how near it keeps while it waits its turn
-        double speed = 330;            // how fast it comes after your cat (cm/s)
-        double cooldown_min = 1.4, cooldown_max = 2.6;   // between its attacks
         double give_up_range = 2500;   // farther than this from your cat,
         double leash = 2000;           // or than this from where it joined the fight,
         double give_up_after = 3;      // for this long: it goes back to roaming
         double stagger = 0.5;          // a hit in its wind-up stops the attack; it reels this long
+        double commit = 0.3;           // the last part of a wind-up it no longer turns to your cat (when to dodge)
+        double quick = 0.45;           // a combo's second strike, or a counter, lands this long after it starts
+        double combo_gap = 0.15;       // between a strike and a combo's second
+        double punish = 0.7;           // after striking it stays open this long, then backs off
+        double retreat = 0.5;          // backing off to its spacing takes this long
+        double hop = 0.6;              // a hop aside takes this long,
+        double hop_safe = 0.45;        // the first part of it out of reach of your cat's claws (a light attack lands in it)
+        double posture_hit = 25;       // a guarded light hit fills its posture by this (a heavy one twice)
+        double posture_regen = 15;     // posture lost again each second it isn't guarding
+        double guard_chip = 0.2;       // the part of a hit's damage a guard lets through
+        double broken_for = 2.0;       // its guard broken: it reels this long, open to a riposte
+        double pace_turn = 2.5;        // pacing: after this long it may turn and pace the other way
+        double flee_escape = 1800;     // fleeing prey this far from your cat has got away
     };
     inline auto duration(const FoeSpec& s) -> double { return (s.to - s.from) / s.rate; }
     inline auto hit_at(const FoeSpec& s) -> double { return (s.hit - s.from) / s.rate; }
+
+    // How an animal of a kind fights. They don't all rush in: each keeps its distance (`spacing`), pacing round your cat
+    // while it waits for an opening, and only one attacks at a time. Some guard when your cat attacks them from in
+    // front, and a guard can be broken by filling its posture (heavy attacks fill it twice as fast); some hop aside;
+    // some hold their wind-up to bait an early dodge (a feint), strike twice, or strike back after a guarded hit. Prey
+    // that's losing runs for it.
+    struct FoeProfile
+    {
+        double spacing = 260;          // the ring it paces while it waits (cm from your cat)
+        double attack_range = 150;     // it rushes in to this to strike
+        double speed = 330;            // closing in (cm/s)
+        double pace_speed = 110;       // pacing round your cat
+        double cooldown_min = 2.2, cooldown_max = 4.0;   // between its attacks
+        double guard = 0;              // the chance it guards when your cat attacks it from in front
+        double dodge = 0;              // the chance it hops aside instead
+        double feint = 0;              // the chance its wind-up is held a while before it strikes
+        double feint_min = 0.3, feint_max = 0.8;
+        double combo = 0;              // the chance of a second strike straight after the first
+        double counter = 0;            // the chance it strikes back at once after guarding a hit
+        double posture = 60;           // how much guarding it takes before its guard breaks
+        double guard_for = 1.2;        // how long it holds a guard
+        double flee_below = 0;         // prey: below this part of its health it runs off
+    };
+    inline auto profile(std::wstring_view model) -> FoeProfile
+    {
+        std::wstring m(model);
+        for (auto& c : m) c = static_cast<wchar_t>(std::towlower(c));
+        auto is = [&](const wchar_t* part) { return m.find(part) != std::wstring::npos; };
+        FoeProfile p;
+        if (is(L"rat"))
+        {
+            p.spacing = 220, p.attack_range = 130, p.speed = 360, p.cooldown_min = 2.0, p.cooldown_max = 3.6;
+            p.guard = 0.1, p.dodge = 0.35, p.feint = 0.15, p.combo = 0.15, p.counter = 0.1, p.posture = 45;
+        }
+        else if (is(L"mice") || is(L"mouse"))
+        {
+            p.spacing = 220, p.attack_range = 130, p.speed = 360, p.cooldown_min = 2.0, p.cooldown_max = 3.6;
+            p.dodge = 0.45, p.feint = 0.1, p.posture = 35, p.flee_below = 0.25;
+        }
+        else if (is(L"rabbit"))
+        {
+            p.speed = 380, p.guard = 0.1, p.dodge = 0.35, p.feint = 0.15, p.posture = 40, p.flee_below = 0.3;
+        }
+        else if (is(L"squirrel"))
+        {
+            p.spacing = 240, p.speed = 370, p.dodge = 0.45, p.feint = 0.15, p.posture = 35, p.flee_below = 0.25;
+        }
+        else if (is(L"crow"))
+        {
+            p.dodge = 0.4, p.feint = 0.2, p.combo = 0.15, p.posture = 45;
+        }
+        else if (is(L"bird"))
+        {
+            p.dodge = 0.4, p.feint = 0.2, p.posture = 35, p.flee_below = 0.3;
+        }
+        else if (is(L"snake") || is(L"adder"))
+        {
+            p.spacing = 240, p.speed = 300, p.dodge = 0.2, p.feint = 0.5, p.feint_min = 0.4, p.feint_max = 1.0;
+            p.counter = 0.2, p.posture = 50;
+        }
+        else if (is(L"fox"))
+        {
+            p.spacing = 280, p.cooldown_min = 2.0, p.cooldown_max = 3.4, p.guard = 0.35, p.dodge = 0.15, p.feint = 0.25;
+            p.combo = 0.3, p.counter = 0.3, p.posture = 75;
+        }
+        else if (is(L"badger"))
+        {
+            p.speed = 280, p.pace_speed = 90, p.cooldown_min = 2.4, p.cooldown_max = 4.2, p.guard = 0.55, p.feint = 0.35;
+            p.combo = 0.35, p.counter = 0.35, p.posture = 110, p.guard_for = 1.6;
+        }
+        else if (is(L"dog"))
+        {
+            p.spacing = 280, p.guard = 0.3, p.dodge = 0.1, p.feint = 0.2, p.combo = 0.4, p.counter = 0.25, p.posture = 90;
+        }
+        else
+        {
+            p.guard = 0.2, p.dodge = 0.15, p.feint = 0.2, p.combo = 0.15, p.counter = 0.15;
+        }
+        return p;
+    }
 
     // How hard an animal hits your cat: a base for its kind, grown 10% a level past the first, times a setting (a
     // rabbit at level 14 takes 23 of a cat's 178).
@@ -461,69 +550,163 @@ namespace rtc
     }
 
     // An animal fighting your cat, as a state that moves on with time:
-    //   Chase:   it comes after your cat (and waits, close, for its turn);
-    //   WindUp:  its attack plays, landing at hit_at();
-    //   Recover: the rest of the attack, then its cooldown;
-    //   Reel:    hit in its wind-up, it reels a moment.
+    //   Approach: it comes toward your cat, to its spacing;
+    //   Pace:     it paces round your cat at its spacing, watching, until it's its turn and its cooldown's done;
+    //   WindUp:   it rushes in and attacks, landing at `strike_at` (held a while first if it's a feint);
+    //   Recover:  it struck; it's open for a moment (or strikes again: a combo);
+    //   Retreat:  it backs off to its spacing;
+    //   Guard:    it guards against your cat's attack (from in front: chip damage, and its posture fills);
+    //   Hop:      it hops aside out of your cat's reach;
+    //   Reel:     hit in its wind-up, parried, or its guard broken;
+    //   Flee:     prey that's losing runs off.
     enum class FoeState
     {
-        Chase,
+        Approach,
+        Pace,
         WindUp,
         Recover,
+        Retreat,
+        Guard,
+        Hop,
         Reel,
+        Flee,
     };
     constexpr auto code(FoeState s) -> std::string_view
     {
         switch (s)
         {
-        case FoeState::Chase: return "chase";
+        case FoeState::Approach: return "approach";
+        case FoeState::Pace: return "pace";
         case FoeState::WindUp: return "windup";
         case FoeState::Recover: return "recover";
+        case FoeState::Retreat: return "retreat";
+        case FoeState::Guard: return "guard";
+        case FoeState::Hop: return "hop";
         case FoeState::Reel: return "reel";
+        case FoeState::Flee: return "flee";
         }
         return "";
     }
     struct Foe
     {
-        FoeState state = FoeState::Chase;
+        FoeState state = FoeState::Approach;
         double t = 0;          // seconds in this state
         double cooldown = 0;   // seconds until it may attack again
-        double far_for = 0;    // seconds it's been past give_up_range
+        double far_for = 0;    // seconds it's been past give_up_range or its leash
         double reel_for = 0;   // how long this reel lasts
         bool landed = false;
+        double strike_at = 0;  // this wind-up lands this long after it starts
+        double hold = 0;       // and is held this long first (a feint), from hold_at
+        double hold_at = 0;
+        bool held = false;     // the hold has begun
+        bool quick = false;    // this wind-up is a combo's second strike or a counter
+        double posture = 0;    // filled by guarded hits; full, its guard breaks
+        double guard_for = 0;
+        int side = 1;          // which way round it paces (1: to your cat's left as it faces it, -1: right)
     };
     // What a step of time asks the caller to do.
     enum class FoeDo
     {
         Nothing,
-        StartAttack,   // stop following, face your cat, play the attack
+        Approach,      // go toward your cat, to its spacing (follow at that distance)
+        Pace,          // pace round your cat on its `side` (again when it turns)
+        StartAttack,   // stop moving, face your cat, rush in to attack_range and play the attack from the start
+        Hold,          // the feint: freeze the attack's animation where it is
+        Release,       // and play it on
         Land,          // the hit: your cat in reach and in front, and not dodging, takes it
-        EndAttack,     // stop the attack's animation, follow again
-        GiveUp,        // too far for too long: back to roaming
+        Combo,         // a second strike: play the attack again from just before its strike (`quick` before it)
+        Retreat,       // stop the attack's animation and back off to its spacing
+        Flee,          // run away from your cat
+        GiveUp,        // too far for too long, or got away: back to roaming
     };
+    // The last part of a normal wind-up: from here it's committed.
+    inline auto commit_at(const FoeSpec& s) -> double { return std::max(0.0, hit_at(s) - s.commit); }
+    // Starts a wind-up: a normal one (with a feint's `hold`, 0 for none) or a quick one (a combo's second, a counter).
+    inline auto wind_up(Foe& f, const FoeSpec& s, bool quick, double hold) -> void
+    {
+        f.state = FoeState::WindUp;
+        f.t = 0;
+        f.landed = false;
+        f.quick = quick;
+        f.hold = quick ? 0 : std::max(0.0, hold);
+        f.hold_at = commit_at(s);
+        f.held = false;
+        f.strike_at = quick ? s.quick : hit_at(s) + f.hold;
+    }
     // One step: `dt` seconds, your cat `distance` away, the animal `from_home` from where it joined the fight, `my_turn`
-    // true when no other animal is attacking. `next_cooldown` is the cooldown to start after an attack (the caller's
-    // random pick between cooldown_min and cooldown_max).
-    inline auto step(Foe& f, const FoeSpec& s, double dt, double distance, double from_home, bool my_turn, double next_cooldown)
-        -> FoeDo
+    // true when no other animal is attacking, `health` the part of its health it has left, and `roll()` a random number
+    // in [0, 1) (the caller's; tests pass their own).
+    template <typename Roll>
+    auto step(Foe& f, const FoeSpec& s, const FoeProfile& p, double dt, double distance, double from_home, bool my_turn,
+              double health, Roll&& roll) -> FoeDo
     {
         f.t += dt;
         f.cooldown = std::max(0.0, f.cooldown - dt);
+        if (f.state != FoeState::Guard) f.posture = std::max(0.0, f.posture - s.posture_regen * dt);
+        if (f.state == FoeState::Flee)
+        {
+            f.far_for = distance > s.flee_escape ? f.far_for + dt : 0;
+            return f.far_for > 1.0 ? FoeDo::GiveUp : FoeDo::Nothing;
+        }
         f.far_for = distance > s.give_up_range || from_home > s.leash ? f.far_for + dt : 0;
         if (f.far_for > s.give_up_after) return FoeDo::GiveUp;
+        // prey that's losing runs for it, unless it's mid-strike or reeling
+        if (p.flee_below > 0 && health < p.flee_below && f.state != FoeState::WindUp && f.state != FoeState::Reel)
+        {
+            f.state = FoeState::Flee;
+            f.t = 0;
+            return FoeDo::Flee;
+        }
+        auto next_cooldown = [&] { return p.cooldown_min + (p.cooldown_max - p.cooldown_min) * roll(); };
+        auto to_pace = [&] {
+            f.state = FoeState::Pace;
+            f.t = 0;
+            return FoeDo::Pace;
+        };
         switch (f.state)
         {
-        case FoeState::Chase:
-            if (distance <= s.attack_range && f.cooldown <= 0 && my_turn)
+        case FoeState::Approach:
+            if (my_turn && f.cooldown <= 0)
             {
-                f.state = FoeState::WindUp;
-                f.t = 0;
-                f.landed = false;
+                wind_up(f, s, false, roll() < p.feint ? p.feint_min + (p.feint_max - p.feint_min) * roll() : 0);
                 return FoeDo::StartAttack;
+            }
+            if (distance <= p.spacing + 40)
+            {
+                f.side = roll() < 0.5 ? 1 : -1;
+                return to_pace();
+            }
+            return FoeDo::Nothing;
+        case FoeState::Pace:
+            if (my_turn && f.cooldown <= 0)
+            {
+                wind_up(f, s, false, roll() < p.feint ? p.feint_min + (p.feint_max - p.feint_min) * roll() : 0);
+                return FoeDo::StartAttack;
+            }
+            if (distance > p.spacing + 150)
+            {
+                f.state = FoeState::Approach;
+                f.t = 0;
+                return FoeDo::Approach;
+            }
+            if (f.t >= s.pace_turn)
+            {
+                f.t = 0;
+                if (roll() < 0.4)
+                {
+                    f.side = -f.side;
+                    return FoeDo::Pace;
+                }
             }
             return FoeDo::Nothing;
         case FoeState::WindUp:
-            if (!f.landed && f.t >= hit_at(s))
+            if (f.hold > 0 && !f.held && f.t >= f.hold_at)
+            {
+                f.held = true;
+                return FoeDo::Hold;
+            }
+            if (f.hold > 0 && f.held && f.t >= f.hold_at + f.hold && f.t - dt < f.hold_at + f.hold) return FoeDo::Release;
+            if (!f.landed && f.t >= f.strike_at)
             {
                 f.landed = true;
                 f.state = FoeState::Recover;
@@ -532,35 +715,131 @@ namespace rtc
             }
             return FoeDo::Nothing;
         case FoeState::Recover:
-            if (f.t >= duration(s) - hit_at(s))
+            if (!f.quick && f.t >= s.combo_gap && f.t - dt < s.combo_gap && roll() < p.combo)
             {
-                f.state = FoeState::Chase;
+                wind_up(f, s, true, 0);
+                return FoeDo::Combo;
+            }
+            if (f.t >= s.punish)
+            {
+                f.state = FoeState::Retreat;
                 f.t = 0;
-                f.cooldown = next_cooldown;
-                return FoeDo::EndAttack;
+                f.cooldown = next_cooldown();
+                return FoeDo::Retreat;
             }
             return FoeDo::Nothing;
+        case FoeState::Retreat:
+            return f.t >= s.retreat ? to_pace() : FoeDo::Nothing;
+        case FoeState::Guard:
+            return f.t >= f.guard_for ? to_pace() : FoeDo::Nothing;
+        case FoeState::Hop:
+            return f.t >= s.hop ? to_pace() : FoeDo::Nothing;
         case FoeState::Reel:
             if (f.t >= f.reel_for)
             {
-                f.state = FoeState::Chase;
+                f.state = FoeState::Retreat;
                 f.t = 0;
-                f.cooldown = next_cooldown;
-                return FoeDo::EndAttack;
+                f.cooldown = std::max(f.cooldown, next_cooldown() * 0.5);
+                return FoeDo::Retreat;
             }
             return FoeDo::Nothing;
+        case FoeState::Flee: break;
         }
         return FoeDo::Nothing;
     }
-    // Your cat hit it: in its wind-up (before it lands) that stops the attack and it reels `seconds` (FoeSpec's
-    // stagger); true when it did.
-    inline auto stagger(Foe& f, double seconds) -> bool
+
+    // Your cat starts an attack at it (it's in front of your cat and near): closing in, pacing or backing off, it may
+    // guard or hop aside (`roll` in [0, 1)); already guarding, it keeps its guard up as long again (so a guard is worn
+    // down by its posture, waited out, or got round). Mid-attack, open after striking, reeling or fleeing, it can't:
+    // those are the times to hit it.
+    enum class FoeReaction
     {
-        if (f.state != FoeState::WindUp || f.landed) return false;
-        f.state = FoeState::Reel;
-        f.t = 0;
-        f.reel_for = seconds;
-        return true;
+        None,
+        Guard,
+        KeepGuard,
+        Hop,
+    };
+    inline auto react(Foe& f, const FoeProfile& p, double roll) -> FoeReaction
+    {
+        if (f.state == FoeState::Guard)
+        {
+            f.t = 0;
+            return FoeReaction::KeepGuard;
+        }
+        if (f.state != FoeState::Approach && f.state != FoeState::Pace && f.state != FoeState::Retreat) return FoeReaction::None;
+        if (roll < p.guard)
+        {
+            f.state = FoeState::Guard;
+            f.t = 0;
+            f.guard_for = p.guard_for;
+            return FoeReaction::Guard;
+        }
+        if (roll < p.guard + p.dodge)
+        {
+            f.state = FoeState::Hop;
+            f.t = 0;
+            return FoeReaction::Hop;
+        }
+        return FoeReaction::None;
+    }
+
+    // Your cat's hit landing on it: from in front of it (`front`) or not, heavy or not.
+    enum class FoeHit
+    {
+        Hit,        // the whole hit
+        Staggered,  // in its wind-up: the whole hit, and its attack stops (it reels)
+        Missed,     // it's in the safe part of a hop
+        Blocked,    // guarded: guard_chip of it, and its posture fills
+        Countered,  // guarded, and it strikes back at once (a quick wind-up)
+        Broken,     // its posture full: its guard breaks, nothing gets through, and it reels, open to a riposte
+    };
+    constexpr auto code(FoeHit h) -> std::string_view
+    {
+        switch (h)
+        {
+        case FoeHit::Hit: return "hit";
+        case FoeHit::Staggered: return "staggered";
+        case FoeHit::Missed: return "missed";
+        case FoeHit::Blocked: return "blocked";
+        case FoeHit::Countered: return "countered";
+        case FoeHit::Broken: return "broken";
+        }
+        return "";
+    }
+    struct FoeHitResult
+    {
+        FoeHit what = FoeHit::Hit;
+        double part = 1;   // the part of the hit's damage it takes
+    };
+    inline auto take_hit(Foe& f, const FoeSpec& s, const FoeProfile& p, bool front, bool heavy, double roll) -> FoeHitResult
+    {
+        if (f.state == FoeState::Hop && f.t < s.hop_safe) return {FoeHit::Missed, 0};
+        if (f.state == FoeState::Guard && front)
+        {
+            f.posture += s.posture_hit * (heavy ? 2 : 1);
+            if (f.posture >= p.posture)
+            {
+                f.posture = 0;
+                f.state = FoeState::Reel;
+                f.t = 0;
+                f.reel_for = s.broken_for;
+                return {FoeHit::Broken, 0};
+            }
+            if (roll < p.counter)
+            {
+                wind_up(f, s, true, 0);
+                return {FoeHit::Countered, s.guard_chip};
+            }
+            return {FoeHit::Blocked, s.guard_chip};
+        }
+        if (f.state == FoeState::WindUp && !f.landed)
+        {
+            f.state = FoeState::Reel;
+            f.t = 0;
+            f.reel_for = s.stagger;
+            return {FoeHit::Staggered, 1};
+        }
+        return {FoeHit::Hit, 1};
     }
     // Your cat parried it: whatever it was doing, it reels `seconds`, open to a riposte.
     inline auto parried(Foe& f, double seconds) -> void
@@ -570,7 +849,7 @@ namespace rtc
         f.reel_for = seconds;
         f.landed = true;
     }
-    // Whether it holds the turn to attack (only one animal attacks at a time; the others wait close).
+    // Whether it holds the turn to attack (only one animal attacks at a time; the others pace and wait).
     inline auto attacking(const Foe& f) -> bool { return f.state == FoeState::WindUp || f.state == FoeState::Recover; }
 
     // ------------------------------------------------------------------------------------------- blocking and parrying

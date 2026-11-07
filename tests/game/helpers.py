@@ -59,8 +59,11 @@ def passive(agent, on):
 
 def turn_on(agent, fighting_back=False):
     """The mod on: the game in front, Sandbox mode saying so. The animals don't fight back unless asked (step 5's
-    tests): the earlier steps' put animals held still beside your cat."""
+    tests): the earlier steps' put animals held still beside your cat. When they do, none of their chances comes up
+    (no guard, hop, feint, combo or counter: RealtimeCombat.foe_rolls 0.99) and prey fights on at any health
+    (RealtimeCombat.no_flee), so their attacks come as the tests time them; test_foes.py changes those itself."""
     agent.hotkey("Home", focus=True)
+    agent.lua("WCModsCpp.share('RealtimeCombat.foe_rolls', 0.99) WCModsCpp.share('RealtimeCombat.no_flee', true) return true")
     passive(agent, not fighting_back)
     sandbox(agent, True)
     until_value(agent, "state", "on", 5)

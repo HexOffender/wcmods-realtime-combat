@@ -11,6 +11,7 @@
 
 #include <WCMods/WCMods.hpp>
 
+#include <functional>
 #include <optional>
 #include <string>
 
@@ -34,6 +35,10 @@ namespace rtc::attacks
         std::optional<Attack> next;   // pressed during the last part of this one
         int made = 0, hits = 0, refused = 0;
         double damage_multiplier = 1;
+        // foes.hpp's, set as the mod starts: an attack begun (the animals in front may guard or hop aside), and the
+        // part of a hit's damage an animal takes (its guard, its hop; 1 for the whole hit, 0 for none)
+        std::function<void(Attack)> on_start;
+        std::function<double(UObject*, Attack, Vec)> on_land;
     };
     inline auto state() -> State&
     {
@@ -70,6 +75,7 @@ namespace rtc::attacks
         }
         if (UObject* target = lockon::locked()) game::turn_to(me, target);
         s.montage = game::play_from(me, sp.tag, sp.from, sp.rate);
+        if (s.on_start) s.on_start(a);
         s.now = a;
         s.elapsed = 0;
         s.landed = false;
@@ -105,7 +111,10 @@ namespace rtc::attacks
             if (enemies::defeated(animal.actor)) continue;
             auto them = game::at(animal.actor);
             if (!them || !in_reach(*at, *yaw, *them, sp.reach, sp.cone) || !game::can_see(animal.actor)) continue;
-            enemies::hit(animal.actor, damage, *at, sp.push);
+            const double part = s.on_land ? s.on_land(animal.actor, a, *at) : 1;
+            if (part <= 0) continue;   // it hopped out of reach, or its guard broke (it reels, open)
+            // through its guard: a part of the damage, and no flinch or push
+            enemies::hit(animal.actor, damage * part, *at, part < 1 ? 0 : sp.push, part >= 1);
             wcmods::share("hits", ++s.hits);
             wcmods::share("last_hit", static_cast<double>(game::id(animal.actor)));
         }
