@@ -107,6 +107,7 @@
     <ClCompile Include="cpp\src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpp\src\allies.hpp" />
     <ClInclude Include="cpp\src\attacks.hpp" />
     <ClInclude Include="cpp\src\bodies.hpp" />
     <ClInclude Include="cpp\src\dodge.hpp" />

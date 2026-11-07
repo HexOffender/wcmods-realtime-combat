@@ -16,6 +16,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cpp\src\allies.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="cpp\src\attacks.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>

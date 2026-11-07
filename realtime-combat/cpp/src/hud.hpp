@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "allies.hpp"
 #include "enemies.hpp"
 #include "flask.hpp"
 #include "foes.hpp"
@@ -41,6 +42,7 @@ namespace rtc::hud
         std::vector<Widget> pips;     // a pip a drink
         int pips_lit = -1;
         std::map<UObject*, Bar> bars;
+        std::map<UObject*, Bar> ally_bars;   // your party's (allies.hpp), green, with their names
         int shown = -1;
         bool target_shown = false;
     };
@@ -85,6 +87,18 @@ namespace rtc::hud
         return b;
     }
 
+    inline auto make_ally_bar() -> Bar
+    {
+        State& s = state();
+        Bar b;
+        b.bar = wcmods::ui::progress(1.0, wcmods::UiColor::hex(L"#4f9d5d"));
+        s.canvas.add(b.bar).size(150, 11);
+        b.bar.set_opacity(0.92f);
+        b.name = wcmods::ui::text(L"", {.size = 22, .color = wcmods::UiColor::hex(L"#d8efd0")});
+        s.canvas.add(b.name).auto_size(true);
+        return b;
+    }
+
     inline auto remove_bar(Bar& b) -> void
     {
         if (b.bar) b.bar.remove();
@@ -96,6 +110,8 @@ namespace rtc::hud
     {
         for (auto& [animal, b] : state().bars) remove_bar(b);
         state().bars.clear();
+        for (auto& [cat, b] : state().ally_bars) remove_bar(b);
+        state().ally_bars.clear();
     }
 
     // The flask's pips: one a drink, made again when the most changes.
@@ -217,6 +233,36 @@ namespace rtc::hud
                 else b.posture.hide();
                 wcmods::share("target_posture", p);
             }
+        }
+        // your party's: fighting, or not yet whole again
+        std::erase_if(s.ally_bars, [](auto& e) {
+            auto it = allies::state().all.find(e.first);
+            const bool keep = game::staying(e.first) && it != allies::state().all.end() &&
+                              (it->second.fighting || it->second.health < it->second.max - 0.5);
+            if (!keep) remove_bar(e.second);
+            return !keep;
+        });
+        for (auto& [cat, a] : allies::state().all)
+        {
+            if (!game::staying(cat) || (!a.fighting && a.health >= a.max - 0.5)) continue;
+            auto it = s.ally_bars.find(cat);
+            if (it == s.ally_bars.end()) it = s.ally_bars.emplace(cat, make_ally_bar()).first;
+            Bar& b = it->second;
+            auto at = game::at(cat);
+            auto screen = at ? game::on_screen({at->x, at->y, at->z + 30}) : std::nullopt;
+            if (!screen)
+            {
+                b.bar.hide();
+                b.name.hide();
+                continue;
+            }
+            b.bar.set_value(a.max > 0 ? a.health / a.max : 0);
+            place(b.bar, screen->first, screen->second, 0.5, 1.0);
+            b.bar.show_passive();
+            const std::wstring label = a.down ? a.display + L"  ·  down" : a.display;
+            if (b.name.text() != label) b.name.set_text(label);
+            place(b.name, screen->first, screen->second - 16, 0.5, 1.0);
+            b.name.show_passive();
         }
         if (shown != s.shown) wcmods::share("bars", shown);
         if (target_shown != s.target_shown) wcmods::share("target_bar", target_shown);

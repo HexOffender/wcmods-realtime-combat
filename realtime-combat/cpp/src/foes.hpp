@@ -26,6 +26,7 @@
 #include <WCMods/WCMods.hpp>
 
 #include <format>
+#include <functional>
 #include <map>
 #include <optional>
 #include <random>
@@ -65,6 +66,7 @@ namespace rtc::foes
         // the tests' switches, read once a frame: every chance's roll fixed, and prey fighting on at any health
         std::optional<double> fixed_roll;
         bool no_flee = false;
+        std::function<void(UObject*)> on_swing;   // allies.hpp's: an attack landing finds your party's cats too
     };
     inline auto state() -> State&
     {
@@ -166,6 +168,7 @@ namespace rtc::foes
         auto me = game::at(wcmods::player());
         auto facing = game::facing(animal);
         if (!them || !me || !facing) return false;
+        if (s.on_swing) s.on_swing(animal);
         if (!in_reach(*them, *facing, *me, spec.reach, spec.cone))
         {
             wcmods::share("missed", ++s.missed);

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -277,6 +278,12 @@ namespace rtc::game
         return L"";
     }
     inline auto clan_cat(UObject* actor) -> bool { return actor && wcmods::has_tag(actor, L"ClanLife.cat"); }
+    // Your party's cats near (allies.hpp finds them): never among the fighters, so your blows pass them by.
+    inline auto allies() -> std::set<UObject*>&
+    {
+        static std::set<UObject*> a;
+        return a;
+    }
     // One Clan life marks hostile (a rival, a patrol challenging your cat): it joins a fight by itself, as an animal does.
     inline auto hostile(UObject* actor) -> bool { return actor && wcmods::has_tag(actor, L"ClanLife.hostile"); }
     inline auto animals(double radius) -> std::vector<wcmods::Animal>
@@ -326,7 +333,7 @@ namespace rtc::game
         if (!me) return out;
         for (const wcmods::Animal& a : n.all)
         {
-            if (!staying(a.actor)) continue;
+            if (!staying(a.actor) || allies().contains(a.actor)) continue;
             auto where = at(a.actor);
             if (!where) continue;
             const double d = flat_distance(*me, *where);

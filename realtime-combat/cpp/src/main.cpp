@@ -109,6 +109,7 @@ namespace
                 rtc::hurt::clear();
                 rtc::hud::clear();
                 rtc::foes::clear();
+                rtc::allies::clear();
                 rtc::cats::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
@@ -167,6 +168,7 @@ namespace
         // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
         if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
         else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
+        rtc::allies::frame(dt);
         rtc::cats::frame(dt, pressed);
         rtc::enemies::frame(dt);
         rtc::hud::frame(dt);
