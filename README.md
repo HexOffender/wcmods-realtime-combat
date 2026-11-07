@@ -23,6 +23,7 @@ notice your cat, it pounces on one, or walks into one. Instead:
 | **Dodge** the way you're moving (standing still: back) | Left Alt | B |
 | **Block**, held; raised just before a hit lands: **parry** | Right mouse button | LB |
 | **Drink** from the flask | Z | D-pad up |
+| **The killing blow** on a [Clan life](https://github.com/HexOffender/wcmods-clan-life) cat that's yielded | H | D-pad down |
 
 - **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
   it, and none comes back while you act or for a moment after. An action needs at least half its cost.
@@ -50,6 +51,14 @@ notice your cat, it pounces on one, or walks into one. Instead:
   health over a second. A hit while drinking stops it. It fills again when your cat sleeps, goes back to camp,
   or comes into the forest.
 - **Beaten prey** goes on your Clan's fresh-kill pile.
+- **Clan life's cats** (with the [Clan life](https://github.com/HexOffender/wcmods-clan-life) mod) can be fought too:
+  - Strike one and it fights back as a cat does: the cats' own claws, guards, dodges, feints, double strikes and
+    counters.
+  - A kit only runs, and a medicine cat barely defends itself.
+  - The others leave you alone unless Clan life sets one against you.
+  - Beaten, a cat yields: it goes down and waits. Walk away (or leave it a while) and it's spared; H gives the
+    killing blow.
+  - Clan life hears of it all: who you fought, spared or killed, and who saw it. The cats remember.
 - **Falling:** at no health your cat goes down, every fight ends, and it's back at its Clan's camp, healed,
   its flask full.
 

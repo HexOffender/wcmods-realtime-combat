@@ -34,6 +34,9 @@
     <ClInclude Include="cpp\src\foes.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="cpp\src\cats.hpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="cpp\src\game.hpp">
       <Filter>Source Files</Filter>
     </ClInclude>

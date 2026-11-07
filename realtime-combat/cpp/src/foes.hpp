@@ -96,6 +96,13 @@ namespace rtc::foes
     inline auto share_count() -> void { wcmods::share("foes", static_cast<double>(state().all.size())); }
 
     inline auto engaged(UObject* animal) -> bool { return state().all.contains(animal); }
+    // What its attack is: a cat's quick claw, or an animal's default fight animation.
+    inline auto spec_for(UObject* actor) -> const FoeSpec&
+    {
+        static const FoeSpec animal;
+        return game::clan_cat(actor) ? cat_foe_spec() : animal;
+    }
+
 
     // Its posture as a part of what breaks its guard (0 to 1), for the HUD; nullopt for an animal not fighting.
     inline auto posture(UObject* animal) -> std::optional<double>
@@ -137,7 +144,8 @@ namespace rtc::foes
             stop_animation(animal, it->second, 0.2);
             wcmods::stop_following(animal, false);
             wcmods::stop_moving(animal);
-            if (roam)
+            if (roam && game::clan_cat(animal)) enemies::forget(animal);   // (Clan life walks its cats: no game tree to start)
+            else if (roam)
             {
                 wcmods::restart_ai(animal);   // its tree run again
                 enemies::forget(animal);      // and whole again, if it fights another time
@@ -153,7 +161,7 @@ namespace rtc::foes
     inline auto land(UObject* animal) -> bool
     {
         State& s = state();
-        const FoeSpec spec;
+        const FoeSpec& spec = spec_for(animal);
         auto them = game::at(animal);
         auto me = game::at(wcmods::player());
         auto facing = game::facing(animal);
@@ -175,7 +183,7 @@ namespace rtc::foes
     // Its guard: crouched, facing your cat (a stand-in: its attack's wind-up held still, low and watching).
     inline auto raise_guard(UObject* animal, Entry& e) -> void
     {
-        const FoeSpec spec;
+        const FoeSpec& spec = spec_for(animal);
         wcmods::stop_following(animal, false);
         wcmods::stop_moving(animal);
         wcmods::face(animal, wcmods::player());
@@ -222,7 +230,7 @@ namespace rtc::foes
     // A quick wind-up (a combo's second strike, or a counter): the attack played again from just before its strike.
     inline auto quick_strike(UObject* animal, Entry& e) -> void
     {
-        const FoeSpec spec;
+        const FoeSpec& spec = spec_for(animal);
         wcmods::face(animal, wcmods::player());
         e.montage = game::play_from(animal, spec.tag, std::max(spec.from, spec.hit - spec.quick * spec.rate), spec.rate);
     }
@@ -238,7 +246,7 @@ namespace rtc::foes
         auto them = game::at(animal);
         auto facing = game::facing(animal);
         const bool front = them && facing && std::abs(turn(*facing, yaw_to(*them, from))) <= 75;
-        const FoeSpec spec;
+        const FoeSpec& spec = spec_for(animal);
         const FoeHitResult r = take_hit(e.foe, spec, e.profile, front, a == Attack::Heavy, roll());
         switch (r.what)
         {
@@ -277,7 +285,6 @@ namespace rtc::foes
     inline auto frame(double dt) -> void
     {
         State& s = state();
-        const FoeSpec spec;
         UObject* me = wcmods::player();
         auto at_me = game::at(me);
         if (!me || !at_me) return;
@@ -291,8 +298,13 @@ namespace rtc::foes
         {
             s.look = 0.25;
             if (s.engage > 0)
+            {
                 for (const wcmods::Animal& a : game::animals(s.engage))
                     if (!enemies::defeated(a.actor)) engage(a.actor);
+                // a Clan life cat only by itself when Clan life marks it hostile; the rest when your cat strikes them
+                for (const wcmods::Animal& c : game::cats(s.engage))
+                    if (game::hostile(c.actor) && !enemies::defeated(c.actor)) engage(c.actor);
+            }
             for (UObject* hit : enemies::hit_animals())
                 if (!enemies::defeated(hit)) engage(hit);
         }
@@ -310,6 +322,7 @@ namespace rtc::foes
             }
             auto them = game::at(animal);
             if (!them) continue;
+            const FoeSpec& spec = spec_for(animal);
             const enemies::Enemy& rec = enemies::of(animal);
             // (RealtimeCombat.no_flee, for tests: prey fights on whatever its health)
             const double health = rec.max > 0 && !s.no_flee ? rec.health / rec.max : 1;

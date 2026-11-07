@@ -26,6 +26,7 @@ namespace rtc::input
         Dodge,
         Drink,
         Block,
+        Finish,   // the killing blow on a cat that's yielded (cats.hpp)
         Hurt,   // tests only: your cat takes a small hit, as an animal's would
         Count,
     };
@@ -54,6 +55,7 @@ namespace rtc::input
             {Action::Dodge, "dodge", "dodge", {L"LeftAlt", L"Gamepad_FaceButton_Right"}},
             {Action::Drink, "drink", "drink", {L"Z", L"Gamepad_DPad_Up"}},
             {Action::Block, "block", "block", {L"RightMouseButton", L"Gamepad_LeftShoulder"}},   // held (held(), below)
+            {Action::Finish, "finish", "finish", {L"H", L"Gamepad_DPad_Down"}},
             {Action::Hurt, nullptr, "hurt", {}},   // tests only: no key can be put on it
         };
         return all;

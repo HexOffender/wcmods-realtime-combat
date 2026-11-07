@@ -247,8 +247,38 @@ namespace rtc::game
         static Near n;
         return n;
     }
-    inline auto tick(double dt) -> void { near_state().age += dt; }
-    inline auto forget_animals() -> void { near_state() = {}; }
+    // Clan life's cats near your cat (it tags each "ClanLife.cat", with "ClanLife.rank.<rank>", "ClanLife.id.<id>" and
+    // "ClanLife.name.<name>"), looked for twice a second like the animals.
+    struct NearCats
+    {
+        std::vector<wcmods::Animal> all;
+        double age = 1e9;
+    };
+    inline auto near_cats() -> NearCats&
+    {
+        static NearCats n;
+        return n;
+    }
+    inline auto tick(double dt) -> void
+    {
+        near_state().age += dt;
+        near_cats().age += dt;
+    }
+    inline auto forget_animals() -> void
+    {
+        near_state() = {};
+        near_cats() = {};
+    }
+    // A Clan life cat's tag's value: "ClanLife.rank." -> "warrior" (empty for none).
+    inline auto cat_tag(UObject* cat, std::wstring_view prefix) -> std::wstring
+    {
+        for (const std::wstring& t : wcmods::actor_tags(cat))
+            if (t.rfind(prefix, 0) == 0) return t.substr(prefix.size());
+        return L"";
+    }
+    inline auto clan_cat(UObject* actor) -> bool { return actor && wcmods::has_tag(actor, L"ClanLife.cat"); }
+    // One Clan life marks hostile (a rival, a patrol challenging your cat): it joins a fight by itself, as an animal does.
+    inline auto hostile(UObject* actor) -> bool { return actor && wcmods::has_tag(actor, L"ClanLife.hostile"); }
     inline auto animals(double radius) -> std::vector<wcmods::Animal>
     {
         Near& n = near_state();
@@ -271,6 +301,48 @@ namespace rtc::game
             copy.distance = d;
             out.push_back(std::move(copy));
         }
+        std::sort(out.begin(), out.end(), [](const wcmods::Animal& p, const wcmods::Animal& q) { return p.distance < q.distance; });
+        return out;
+    }
+
+    // Clan life's cats within `radius` (along the ground), nearest first, as animals (`model` "cat", "cat kit" or
+    // "cat medicine"; `kind` its rank).
+    inline auto cats(double radius) -> std::vector<wcmods::Animal>
+    {
+        NearCats& n = near_cats();
+        if (n.age > 0.5)
+        {
+            n.all.clear();
+            for (const wcmods::Nearby& c : wcmods::nearby(wcmods::Kind::Cats, 5000))
+            {
+                if (!clan_cat(c.actor)) continue;
+                const std::wstring rank = cat_tag(c.actor, L"ClanLife.rank.");
+                n.all.push_back({.actor = c.actor, .kind = rank, .model = cat_model(rank)});
+            }
+            n.age = 0;
+        }
+        std::vector<wcmods::Animal> out;
+        auto me = at(wcmods::player());
+        if (!me) return out;
+        for (const wcmods::Animal& a : n.all)
+        {
+            if (!staying(a.actor)) continue;
+            auto where = at(a.actor);
+            if (!where) continue;
+            const double d = flat_distance(*me, *where);
+            if (d > radius) continue;
+            wcmods::Animal copy = a;
+            copy.distance = d;
+            out.push_back(std::move(copy));
+        }
+        std::sort(out.begin(), out.end(), [](const wcmods::Animal& p, const wcmods::Animal& q) { return p.distance < q.distance; });
+        return out;
+    }
+    // The animals and Clan life's cats within `radius`, nearest first: what your cat's blows can land on.
+    inline auto fighters(double radius) -> std::vector<wcmods::Animal>
+    {
+        auto out = animals(radius);
+        for (auto& c : cats(radius)) out.push_back(std::move(c));
         std::sort(out.begin(), out.end(), [](const wcmods::Animal& p, const wcmods::Animal& q) { return p.distance < q.distance; });
         return out;
     }

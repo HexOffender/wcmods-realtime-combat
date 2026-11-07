@@ -324,7 +324,9 @@ namespace rtc
             const wchar_t* part;
             double health;
         };
-        static const Kind kinds[] = {{L"mice", 30}, {L"mouse", 30}, {L"rat", 40}, {L"rabbit", 45}, {L"squirrel", 35},
+        // (a Clan life cat's model is "cat", "cat kit" or "cat medicine": the kits and the medicine cats first)
+        static const Kind kinds[] = {{L"cat kit", 20}, {L"cat medicine", 60}, {L"cat", 85},
+                                     {L"mice", 30}, {L"mouse", 30}, {L"rat", 40}, {L"rabbit", 45}, {L"squirrel", 35},
                                      {L"bird", 35}, {L"crow", 40}, {L"snake", 70}, {L"adder", 70}, {L"fox", 110},
                                      {L"badger", 150}, {L"dog", 160}};
         for (const Kind& k : kinds)
@@ -427,6 +429,35 @@ namespace rtc
         double flee_escape = 1800;     // fleeing prey this far from your cat has got away
     };
     inline auto duration(const FoeSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    // A cat's attack: the cats' quick claw (your cat's light attack, its timing measured the same), not an animal's
+    // default fight animation.
+    inline auto cat_foe_spec() -> const FoeSpec&
+    {
+        static const FoeSpec s = [] {
+            FoeSpec f;
+            f.tag = L"Gameplay.Combat.Attack.Universal.2";
+            f.from = 1.0, f.to = 1.95, f.hit = 1.5, f.rate = 1.0;
+            return f;
+        }();
+        return s;
+    }
+    // A Clan life cat's level by its rank (Clan life tags it "ClanLife.rank.<rank>"), and the model it fights as.
+    inline auto cat_level(std::wstring_view rank) -> int
+    {
+        if (rank == L"kit") return 1;
+        if (rank == L"apprentice" || rank == L"medicine_cat_apprentice") return 4;
+        if (rank == L"medicine_cat" || rank == L"elder") return 6;
+        if (rank == L"queen") return 8;
+        if (rank == L"deputy") return 13;
+        if (rank == L"leader") return 16;
+        return 9;   // a warrior
+    }
+    inline auto cat_model(std::wstring_view rank) -> std::wstring
+    {
+        if (rank == L"kit") return L"cat kit";
+        if (rank == L"medicine_cat" || rank == L"medicine_cat_apprentice") return L"cat medicine";
+        return L"cat";
+    }
     inline auto hit_at(const FoeSpec& s) -> double { return (s.hit - s.from) / s.rate; }
 
     // How an animal of a kind fights. They don't all rush in: each keeps its distance (`spacing`), pacing round your cat
@@ -457,7 +488,23 @@ namespace rtc
         for (auto& c : m) c = static_cast<wchar_t>(std::towlower(c));
         auto is = [&](const wchar_t* part) { return m.find(part) != std::wstring::npos; };
         FoeProfile p;
-        if (is(L"rat"))
+        if (is(L"cat kit"))
+        {
+            // a kit doesn't fight: it runs from the first blow
+            p.speed = 300, p.cooldown_min = p.cooldown_max = 1e9, p.dodge = 0.3, p.posture = 20, p.flee_below = 2;
+        }
+        else if (is(L"cat medicine"))
+        {
+            // a medicine cat defends itself, weakly
+            p.cooldown_min = 3.5, p.cooldown_max = 5.5, p.guard = 0.15, p.dodge = 0.35, p.feint = 0.05, p.posture = 40;
+        }
+        else if (is(L"cat"))
+        {
+            // a warrior trained to fight cats: guards, dodges, feints, strikes twice, strikes back
+            p.spacing = 230, p.attack_range = 150, p.speed = 340, p.cooldown_min = 2.0, p.cooldown_max = 3.6;
+            p.guard = 0.35, p.dodge = 0.25, p.feint = 0.25, p.combo = 0.25, p.counter = 0.25, p.posture = 70;
+        }
+        else if (is(L"rat"))
         {
             p.spacing = 220, p.attack_range = 130, p.speed = 360, p.cooldown_min = 2.0, p.cooldown_max = 3.6;
             p.guard = 0.1, p.dodge = 0.35, p.feint = 0.15, p.combo = 0.15, p.counter = 0.1, p.posture = 45;
@@ -520,7 +567,8 @@ namespace rtc
             const wchar_t* part;
             double damage;
         };
-        static const Kind kinds[] = {{L"mice", 8}, {L"mouse", 8}, {L"rat", 9}, {L"rabbit", 10}, {L"squirrel", 9}, {L"bird", 9},
+        static const Kind kinds[] = {{L"cat kit", 0}, {L"cat medicine", 5}, {L"cat", 14},
+                                     {L"mice", 8}, {L"mouse", 8}, {L"rat", 9}, {L"rabbit", 10}, {L"squirrel", 9}, {L"bird", 9},
                                      {L"crow", 10}, {L"snake", 16}, {L"adder", 16}, {L"fox", 20}, {L"badger", 26}, {L"dog", 28}};
         for (const Kind& k : kinds)
             if (m.find(k.part) != std::wstring::npos) return k.damage;

@@ -17,6 +17,8 @@
 #include <vector>
 
 #include "game.hpp"
+#include <functional>
+
 #include "rules.hpp"
 
 namespace rtc::enemies
@@ -32,12 +34,16 @@ namespace rtc::enemies
         double gone_in = 0;   // seconds until a defeated one is taken out of the world
         int hits = 0;         // how many times your cat's hit it
         double riposte_left = 0, riposte = 1;   // parried: seconds its next hit from your cat does `riposte` times
+        bool cat = false;        // one of Clan life's cats: beaten, it yields (it isn't taken away)
+        int id = -1;             // Clan life's id for it
+        std::wstring display;    // its name, for the HUD
     };
     struct State
     {
         std::map<UObject*, Enemy> all;
         int defeated = 0, ripostes = 0;
         double health_multiplier = 1;
+        std::function<void(UObject*, const struct Enemy&)> on_yield;   // cats.hpp's
     };
     inline auto state() -> State&
     {
@@ -84,6 +90,22 @@ namespace rtc::enemies
         Enemy e;
         e.model = wcmods::name(wcmods::get(animal, L"Mesh.SkeletalMesh").object);
         e.level = level_of(animal);
+        if (game::clan_cat(animal))
+        {
+            const std::wstring rank = game::cat_tag(animal, L"ClanLife.rank.");
+            e.cat = true;
+            e.model = cat_model(rank);
+            e.level = cat_level(rank);
+            e.display = game::cat_tag(animal, L"ClanLife.name.");
+            try
+            {
+                e.id = std::stoi(game::cat_tag(animal, L"ClanLife.id."));
+            }
+            catch (...)
+            {
+                e.id = -1;
+            }
+        }
         e.max = e.health = enemy_health(e.model, e.level, state().health_multiplier);
         share(animal, e);
         return all.emplace(animal, e).first->second;
@@ -104,6 +126,16 @@ namespace rtc::enemies
         auto it = all.find(animal);
         if (it == all.end() || it->second.defeated) return;
         unshare(animal);
+        all.erase(it);
+    }
+
+    // A cat that yielded, spared or killed (cats.hpp): its record gone, whole again if it fights another time.
+    inline auto forget_yielded(UObject* cat) -> void
+    {
+        auto& all = state().all;
+        auto it = all.find(cat);
+        if (it == all.end()) return;
+        unshare(cat);
         all.erase(it);
     }
 
@@ -149,6 +181,17 @@ namespace rtc::enemies
         e.health = after_hit(e.health, damage);
         share(animal, e);
         auto at = game::at(animal);
+        if (e.health <= 0 && e.cat)
+        {
+            // a cat yields: down, beaten, waiting to be spared or finished (cats.hpp)
+            e.defeated = true;
+            e.gone_in = 1e9;
+            wcmods::stop_following(animal, false);
+            wcmods::stop_moving(animal);
+            wcmods::play_montage(animal, L"Animation.Combat.Lose.1");
+            if (state().on_yield) state().on_yield(animal, e);
+            return true;
+        }
         if (e.health <= 0)
         {
             e.defeated = true;
@@ -194,7 +237,7 @@ namespace rtc::enemies
                 it = all.erase(it);
                 continue;
             }
-            if (e.defeated)
+            if (e.defeated && !e.cat)   // (a cat that's yielded stays: cats.hpp sees to it)
             {
                 e.gone_in -= dt;
                 if (e.gone_in <= 0)
@@ -214,7 +257,7 @@ namespace rtc::enemies
     {
         for (auto& [animal, e] : state().all)
         {
-            if (e.defeated && game::staying(animal)) wcmods::remove_animal(animal);
+            if (e.defeated && !e.cat && game::staying(animal)) wcmods::remove_animal(animal);
             unshare(animal);
         }
         state().all.clear();
