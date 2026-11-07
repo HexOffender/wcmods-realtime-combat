@@ -121,10 +121,12 @@ namespace rtc::lockon
     inline auto candidates(const LockSettings& ls) -> std::vector<std::pair<UObject*, Candidate>>
     {
         std::vector<std::pair<UObject*, Candidate>> out;
-        for (const wcmods::Animal& a : game::animals(ls.range + 100))
+        for (const wcmods::Animal& a : game::fighters(ls.range + 100))
         {
             auto where = game::at(a.actor);
             if (!where || enemies::defeated(a.actor)) continue;
+            // a Clan life cat only once it's fighting your cat, or Clan life marks it hostile: not every clanmate about
+            if (game::clan_cat(a.actor) && !enemies::known(a.actor) && !game::hostile(a.actor)) continue;
             out.push_back({a.actor, Candidate{game::id(a.actor), *where, game::can_see(a.actor)}});
         }
         return out;

@@ -201,7 +201,7 @@ namespace rtc::hud
             ++shown;
             if (b.name)
             {
-                const std::wstring label = std::format(L"{}  ·  level {}", display_name(e.model), e.level);
+                const std::wstring label = std::format(L"{}  ·  level {}", e.display.empty() ? display_name(e.model) : e.display, e.level);
                 if (b.name.text() != label) b.name.set_text(label);
                 place(b.name, screen->first, screen->second - 26, 0.5, 1.0);
                 b.name.show_passive();

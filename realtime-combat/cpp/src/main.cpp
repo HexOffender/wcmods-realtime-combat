@@ -23,6 +23,7 @@
 
 #include "attacks.hpp"
 #include "bodies.hpp"
+#include "cats.hpp"
 #include "dodge.hpp"
 #include "enemies.hpp"
 #include "flask.hpp"
@@ -108,6 +109,7 @@ namespace
                 rtc::hurt::clear();
                 rtc::hud::clear();
                 rtc::foes::clear();
+                rtc::cats::clear();
                 rtc::stamina::clear();
                 rtc::bodies::clear();
                 rtc::game::forget_animals();
@@ -165,6 +167,7 @@ namespace
         // the animals fight back (tests can share RealtimeCombat.passive to keep them from it)
         if (rtc::foes::state().fight_back && !wcmods::shared("RealtimeCombat.passive").boolean(false)) rtc::foes::frame(dt);
         else if (!rtc::foes::state().all.empty()) rtc::foes::clear();
+        rtc::cats::frame(dt, pressed);
         rtc::enemies::frame(dt);
         rtc::hud::frame(dt);
     }
@@ -262,6 +265,7 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::hurt::state().on_fall = [] { rtc::fall::begin(); };
         rtc::fall::state().end_fights = [] { rtc::foes::clear(); };
         rtc::foes::hook();
+        rtc::cats::hook();
         wcmods::share("on", false);
         wcmods::share("state", rtc::code(gate().off));
         rtc::lockon::share();

@@ -546,8 +546,28 @@ static void guarding()
     CHECK(rtc::code(rtc::Guarded::GuardBroken) == "guard-broken");
 }
 
+static void cats_fight_as_cats()
+{
+    using namespace rtc;
+    // a Clan life cat by its rank: its level and model
+    CHECK(cat_level(L"kit") == 1 && cat_level(L"apprentice") == 4 && cat_level(L"warrior") == 9 && cat_level(L"leader") == 16);
+    CHECK(cat_model(L"kit") == L"cat kit" && cat_model(L"medicine_cat") == L"cat medicine" && cat_model(L"deputy") == L"cat");
+    // a kit never strikes, and runs from the first blow; a medicine cat hits weakly; a warrior fights well
+    const FoeProfile kit = profile(L"cat kit"), med = profile(L"cat medicine"), war = profile(L"cat");
+    CHECK(kit.flee_below > 1 && kit.cooldown_min > 1e8);
+    CHECK(base_damage(L"cat kit") == 0 && base_damage(L"cat medicine") < base_damage(L"cat"));
+    CHECK(war.guard > med.guard && war.counter > 0 && war.combo > 0);
+    CHECK(base_health(L"cat kit") < base_health(L"cat medicine") && base_health(L"cat medicine") < base_health(L"cat"));
+    // its attack is the cats' quick claw, landing within its swing
+    const FoeSpec& s = cat_foe_spec();
+    CHECK(s.tag == L"Gameplay.Combat.Attack.Universal.2" && s.hit > s.from && s.hit < s.to);
+    // nothing for the fresh-kill pile
+    CHECK(fresh_kill_for(L"cat") == 0);
+}
+
 int main()
 {
+    cats_fight_as_cats();
     guarding();
     the_flask();
     circling_keeps_to_the_circle();
