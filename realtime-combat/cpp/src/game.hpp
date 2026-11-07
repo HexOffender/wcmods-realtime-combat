@@ -260,10 +260,29 @@ namespace rtc::game
         static NearCats n;
         return n;
     }
+    // The cats Clan life names hostile now ("ClanLife.hostile": an exile's old Clan driving it out of camp), read again
+    // twice a second (tick()).
+    struct HostileNames
+    {
+        std::set<std::wstring> names;
+        double age = 1e9;
+    };
+    inline auto hostile_names() -> HostileNames&
+    {
+        static HostileNames h;
+        return h;
+    }
     inline auto tick(double dt) -> void
     {
         near_state().age += dt;
         near_cats().age += dt;
+        HostileNames& h = hostile_names();
+        if ((h.age += dt) > 0.5)
+        {
+            h.age = 0;
+            h.names.clear();
+            for (const wcmods::Json& n : wcmods::shared("ClanLife.hostile").values()) h.names.insert(wcmods::wide(n.string()));
+        }
     }
     inline auto forget_animals() -> void
     {
@@ -284,8 +303,15 @@ namespace rtc::game
         static std::set<UObject*> a;
         return a;
     }
-    // One Clan life marks hostile (a rival, a patrol challenging your cat): it joins a fight by itself, as an animal does.
-    inline auto hostile(UObject* actor) -> bool { return actor && wcmods::has_tag(actor, L"ClanLife.hostile"); }
+    // One Clan life marks hostile (tagged "ClanLife.hostile", or named in its list): it joins a fight by itself, as an
+    // animal does.
+    inline auto hostile(UObject* actor) -> bool
+    {
+        if (!actor) return false;
+        const auto& names = hostile_names().names;
+        if (!names.empty() && names.contains(wcmods::name(actor))) return true;
+        return wcmods::has_tag(actor, L"ClanLife.hostile");
+    }
     inline auto animals(double radius) -> std::vector<wcmods::Animal>
     {
         Near& n = near_state();
