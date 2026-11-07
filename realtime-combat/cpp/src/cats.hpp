@@ -8,7 +8,8 @@
 //   RealtimeCombat.fighting    the names of the cats in a fight with your cat or yielded to it, and of your party's cats
 //                              fighting beside it (allies.hpp) (Clan life leaves them be)
 //   RealtimeCombat.cat_events  the last 30 things that happened, each {n (counting up), what ("fought", "yielded",
-//                              "spared", "killed"; for your party's cats "fought_beside", "fell_beside"), id (Clan
+//                              "spared", "killed", "struck_again" (your cat's own second blow on it in a fight);
+//                              for your party's cats "fought_beside", "fell_beside"), id (Clan
 //                              life's id for the cat), name}
 // Shared for tests too: "cat_events" (how many), "yielded" (how many cats are down now).
 #pragma once
@@ -49,6 +50,7 @@ namespace rtc::cats
         double publish = 0;                // seconds to sharing who's fighting again
         std::wstring fighting_last;
         std::set<UObject*> told_fought;    // cats whose fight with your cat Clan life has heard of
+        std::set<UObject*> told_again;     // ... and that your cat's struck more than once (no accident)
         bool hinted = false;               // the killing blow's hint showing
     };
     inline auto state() -> State&
@@ -140,7 +142,16 @@ namespace rtc::cats
                 s.told_fought.insert(actor);
                 tell("fought", e.id, e.display);
             }
+        // a second blow of your cat's own on the same cat in a fight: no accident (one blow in a crowded fight is
+        // forgiven, the owner's: Clan life weighs only this against the code)
+        for (auto& [actor, e] : enemies::state().all)
+            if (e.cat && e.your_hits >= 2 && !s.told_again.contains(actor))
+            {
+                s.told_again.insert(actor);
+                tell("struck_again", e.id, e.display);
+            }
         std::erase_if(s.told_fought, [](UObject* a) { return !enemies::known(a); });
+        std::erase_if(s.told_again, [](UObject* a) { return !enemies::known(a); });
         std::vector<UObject*> done;
         for (auto& [cat, d] : s.down)
         {
@@ -218,6 +229,7 @@ namespace rtc::cats
         }
         s.down.clear();
         s.told_fought.clear();
+        s.told_again.clear();
         s.fighting_last.clear();
         s.hinted = false;
         wcmods::share("RealtimeCombat.fighting", wcmods::Json::array());

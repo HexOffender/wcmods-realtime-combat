@@ -115,6 +115,7 @@ namespace rtc::attacks
             if (part <= 0) continue;   // it hopped out of reach, or its guard broke (it reels, open)
             // through its guard: a part of the damage, and no flinch or push
             enemies::hit(animal.actor, damage * part, *at, part < 1 ? 0 : sp.push, part >= 1);
+            enemies::count_yours(animal.actor);
             wcmods::share("hits", ++s.hits);
             wcmods::share("last_hit", static_cast<double>(game::id(animal.actor)));
         }
