@@ -202,6 +202,7 @@ namespace
         rtc::attacks::load();
         rtc::enemies::load();
         rtc::foes::load();
+        rtc::dodge::load();
         rtc::flask::reload();
     }
     auto slider_row(wcmods::Ui& ui, const wchar_t* label, const char* key, double fallback, double lo, double hi, double step,
@@ -234,6 +235,7 @@ namespace
             slider_row(ui, L"Drinks in the flask", "flask_charges", 3, 0, 10, 1, L"%.0f");
             slider_row(ui, L"Each drink gives back", "flask_heal", 0.4, 0.1, 1, 0.05, L"x%.2f of your cat's health");
             slider_row(ui, L"Lock-on reaches", "lock_on_reach_m", 15, 5, 40, 1, L"%.0f m");
+            slider_row(ui, L"A dodge goes", "dodge_distance_m", 1.5, 0.5, 5, 0.25, L"%.2f m");
         }, true);
 
         ui.note(L"The keys (keyboard and controller) are in the mod's settings.json, by Unreal's key names; restart the game "
@@ -263,6 +265,7 @@ class RealtimeCombat : public wcmods::ModBase
         rtc::attacks::load();
         rtc::enemies::load();
         rtc::foes::load();
+        rtc::dodge::load();
         rtc::flask::load();
         rtc::hurt::state().on_fall = [] { rtc::fall::begin(); };
         rtc::fall::state().end_fights = [] { rtc::foes::clear(); };

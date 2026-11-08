@@ -487,6 +487,21 @@ namespace rtc::game
         });
     }
 
+    // A montage held where it is, and played on again. A paused montage never blends out when it's stopped (the engine
+    // only advances a playing one's blend): play it on before stopping it, or the pose stays and your cat can't move.
+    inline auto pause_montage(UObject* actor, UObject* montage) -> void
+    {
+        UObject* a = anim(actor);
+        if (!a || !montage) return;
+        wcmods::call_reflected(a, STR("Montage_Pause"), [&](wcmods::Params& p) { p.set_nth(0, wcmods::Value::of(montage)); });
+    }
+    inline auto resume_montage(UObject* actor, UObject* montage) -> void
+    {
+        UObject* a = anim(actor);
+        if (!a || !montage) return;
+        wcmods::call_reflected(a, STR("Montage_Resume"), [&](wcmods::Params& p) { p.set_nth(0, wcmods::Value::of(montage)); });
+    }
+
     // A montage's speed as it plays (0 holds it where it is; its own rate plays it on).
     inline auto set_montage_rate(UObject* actor, UObject* montage, double rate) -> void
     {

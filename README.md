@@ -27,7 +27,8 @@ notice your cat, it pounces on one, or walks into one. Instead:
 
 - **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
   it, and none comes back while you act or for a moment after. An action needs at least half its cost.
-- **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge.
+- **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge. A dodge takes it 1.5 m, a cat's hop
+  (`dodge_distance_m` in the settings, 0.5 to 5).
 - **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
   to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
   in front. A light attack pressed as one lands follows it.

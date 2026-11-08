@@ -1,9 +1,9 @@
 // dodge.hpp: step 4, the dodge. Left Alt hops your cat the way the player's moving (its keys, or failing those the way
 // your cat's going; straight back, standing still):
 // the game's side hop (Animation.Combat.Dodge.Left/Right) to that side, or, forward and back, your cat turned so its
-// right hop goes that way, and slid about 3 m along the ground while the hop's in the air (rules.hpp's DodgeSpec). For
-// its first 0.4 s nothing hurts your cat (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an
-// attack short once the attack has landed.
+// right hop goes that way, and slid along the ground while the hop's in the air (rules.hpp's DodgeSpec): 1.5 m, a cat's
+// hop, unless settings.json's dodge_distance_m says otherwise (0.5 to 5). For its first 0.4 s nothing hurts your cat
+// (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an attack short once the attack has landed.
 //
 // Shared for tests: "dodge" (true while one plays), "dodges" (how many made), "dodge_safe" (true while nothing hurts
 // your cat), "dodge_safe_starts" (how many safe moments have begun), "dodge_way" (the yaw it went), "dodge_refused"
@@ -30,11 +30,26 @@ namespace rtc::dodge
         UObject* montage{};
         bool was_safe = false;
         int made = 0, refused = 0, safe_starts = 0;
+        double distance = 150;   // cm it slides: settings.json's dodge_distance_m
     };
     inline auto state() -> State&
     {
         static State s;
         return s;
+    }
+
+    inline auto load() -> void
+    {
+        std::lock_guard lock(wcmods::settings_lock());
+        const double m = wcmods::settings()["dodge_distance_m"].number(1.5);
+        state().distance = (m >= 0.5 && m <= 5 ? m : 1.5) * 100;
+    }
+    // The dodge as the settings have it.
+    inline auto spec() -> DodgeSpec
+    {
+        DodgeSpec d;
+        d.distance = state().distance;
+        return d;
     }
 
     inline auto busy() -> bool { return state().on; }
@@ -64,7 +79,7 @@ namespace rtc::dodge
         auto view = game::shown_yaw();   // the game walks your cat relative to the view shown
         if (!view) view = game::view_yaw();
         if (!me || !facing || !view) return false;
-        const DodgeSpec d;
+        const DodgeSpec d = spec();
         if (!stamina::spend(d.stamina))
         {
             wcmods::share("dodge_refused", ++s.refused);
@@ -110,7 +125,7 @@ namespace rtc::dodge
             return;
         }
         if (!s.on) return;
-        const DodgeSpec d;
+        const DodgeSpec d = spec();
         const double before = s.elapsed;
         s.elapsed += dt;
         // the slide: the part of this frame inside the hop's window

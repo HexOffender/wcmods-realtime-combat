@@ -1,5 +1,5 @@
 {
-  "_help": "Real-time combat's settings; the mod menu's Real-time combat page changes most of them while you play. enabled: real-time combat in Sandbox mode (false: the game's own fights there too). lock_on_reach_m: how far an animal can be to lock on to it (3 to 60 metres). cat_damage, enemy_health, enemy_damage: multiples of your cat's damage, the animals' health and their damage (1 is as made). animals_fight_back: whether they do; engage_range_m: how near an animal joins a fight by itself (0: only one your cat hits). flask_charges, flask_heal: the flask's drinks and what each gives back (0.4: 40% of your cat's most). finish: the killing blow on a Clan life cat that's yielded (walk away to spare it). keys: the keys and controller buttons for each action, by Unreal's names (Tab, MiddleMouseButton, MouseScrollUp, F, LeftAlt, Gamepad_RightTrigger, Gamepad_DPad_Up...): a list; [] for none. They're read as the game starts: restart it after changing them.",
+  "_help": "Real-time combat's settings; the mod menu's Real-time combat page changes most of them while you play. enabled: real-time combat in Sandbox mode (false: the game's own fights there too). lock_on_reach_m: how far an animal can be to lock on to it (3 to 60 metres). cat_damage, enemy_health, enemy_damage: multiples of your cat's damage, the animals' health and their damage (1 is as made). animals_fight_back: whether they do; engage_range_m: how near an animal joins a fight by itself (0: only one your cat hits). flask_charges, flask_heal: the flask's drinks and what each gives back (0.4: 40% of your cat's most). dodge_distance_m: how far a dodge takes your cat (0.5 to 5 metres; 1.5, a cat's hop). finish: the killing blow on a Clan life cat that's yielded (walk away to spare it). keys: the keys and controller buttons for each action, by Unreal's names (Tab, MiddleMouseButton, MouseScrollUp, F, LeftAlt, Gamepad_RightTrigger, Gamepad_DPad_Up...): a list; [] for none. They're read as the game starts: restart it after changing them.",
   "enabled": true,
   "lock_on_reach_m": 15,
   "keys": {
@@ -47,5 +47,6 @@
   "animals_fight_back": true,
   "engage_range_m": 4,
   "flask_charges": 3,
-  "flask_heal": 0.4
+  "flask_heal": 0.4,
+  "dodge_distance_m": 1.5
 }

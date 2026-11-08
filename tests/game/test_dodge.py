@@ -50,7 +50,8 @@ def _montage(agent):
 
 
 def test_each_way(agent):
-    """Right, left, forward and back of the camera: about 3 m each, the right way, with the hop to that side."""
+    """Right, left, forward and back of the camera: about 1.5 m each (the settings' dodge_distance_m), the right way,
+    with the hop to that side."""
     view = h.control_yaw(agent)
     for word, way in (("dodge_right", 90), ("dodge_left", -90), ("dodge_forward", 0), ("dodge_back", 180)):
         agent.lua("Game.cat():setStamina(100) return true")
@@ -66,7 +67,7 @@ def test_each_way(agent):
         end = _at(agent)
         moved = math.hypot(end[0] - start[0], end[1] - start[1])
         went = math.degrees(math.atan2(end[1] - start[1], end[0] - start[0]))
-        assert 200 < moved < 360, f"{word}: moved {moved:.0f} units"
+        assert 90 < moved < 230, f"{word}: moved {moved:.0f} units"
         off = abs(h.turn(view + way, went))
         assert off < 25, f"{word}: went {off:.0f} degrees off the way asked"
         assert playing == hop, f"{word}: {playing}, with the dodge {side:.0f} degrees right of your cat's facing"
@@ -77,7 +78,7 @@ def test_standing_still_goes_back(agent):
     """With no movement keys held, the key hops your cat straight back from where it faces."""
     facing = agent.lua("return Game.player():K2_GetActorRotation().Yaw")
     moved, went = _dodge(agent, "dodge")
-    assert moved > 200, moved
+    assert moved > 90, moved
     assert abs(h.turn(facing + 180, went)) < 25, (facing, went)
 
 

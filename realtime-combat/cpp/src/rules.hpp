@@ -378,7 +378,7 @@ namespace rtc
     {
         double from = 0.25, to = 1.15, rate = 1.4;
         double slide_from = 0.35, slide_to = 0.85;
-        double distance = 300;
+        double distance = 150;   // cm it slides (dodge.hpp takes it from settings.json's dodge_distance_m)
         double safe = 0.4;
         double stamina = 15;
     };
