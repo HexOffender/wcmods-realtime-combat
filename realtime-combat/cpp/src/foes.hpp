@@ -108,11 +108,14 @@ namespace rtc::foes
     }
 
 
-    // Whether its strike is coming (its wind-up, a feint's hold included): the HUD marks it, the moment to dodge or guard.
-    inline auto winding_up(UObject* animal) -> bool
+    // Whether its blow is about to land: the last `commit` seconds of its wind-up (after a feint's hold), when it's
+    // committed to where it strikes. The HUD marks it: the moment to dodge or guard.
+    inline auto striking_soon(UObject* animal) -> bool
     {
         auto it = state().all.find(animal);
-        return it != state().all.end() && it->second.foe.state == FoeState::WindUp;
+        if (it == state().all.end() || it->second.foe.state != FoeState::WindUp) return false;
+        const Foe& f = it->second.foe;
+        return f.t >= f.strike_at - spec_for(animal).commit;
     }
 
     // Its posture as a part of what breaks its guard (0 to 1), for the HUD; nullopt for an animal not fighting.
@@ -419,15 +422,18 @@ namespace rtc::foes
                 break;
             case FoeState::WindUp:
             {
-                // early on it turns to your cat and rushes in to striking range; the last moment it's committed (dodge
-                // then); held in a feint, it keeps watching
+                // early on it turns to your cat and rushes in to striking range, following it; the last moment it's
+                // committed (dodge then): it neither turns to your cat nor follows it, its rush going straight on (a
+                // dodge aside or back takes your cat out of the blow). Held in a feint, it keeps watching.
                 const double committed = e.foe.quick ? e.foe.strike_at - spec.commit : commit_at(spec);
-                if (e.foe.t < committed || (e.foe.held && e.foe.t < e.foe.hold_at + e.foe.hold)) wcmods::face(animal, me);
+                const bool watching = e.foe.t < committed || (e.foe.held && e.foe.t < e.foe.hold_at + e.foe.hold);
+                if (watching) wcmods::face(animal, me);
                 if (dist > e.profile.attack_range && !e.foe.landed)
                 {
                     const double left = std::max(0.15, e.foe.strike_at - e.foe.t - 0.05);
                     const double gap = dist - e.profile.attack_range;
-                    game::slide(animal, yaw_to(*them, *at_me), std::min({gap / left * dt, 700 * dt, gap}));
+                    if (watching) game::slide(animal, yaw_to(*them, *at_me), std::min({gap / left * dt, 700 * dt, gap}));
+                    else if (auto facing = game::facing(animal)) game::slide(animal, *facing, std::min(gap, 500 * dt));
                 }
                 break;
             }

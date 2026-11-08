@@ -32,7 +32,7 @@ namespace rtc::hud
     struct Bar
     {
         Widget bar, name, posture;
-        Widget warn;   // a red mark over it while its strike is coming (its wind-up): dodge or guard now
+        Widget warn;   // a red mark over it for the last moment of its wind-up (its blow about to land): dodge or guard now
         bool big = false;
     };
     struct State
@@ -221,10 +221,10 @@ namespace rtc::hud
             place(b.bar, screen->first, screen->second, 0.5, 1.0);
             b.bar.show_passive();
             ++shown;
-            // its strike coming: the mark over it from the start of its wind-up to the blow
+            // its blow about to land: the mark over it for the last moment of its wind-up (dodge or guard now)
             if (b.warn)
             {
-                if (foes::winding_up(animal))
+                if (foes::striking_soon(animal))
                 {
                     place(b.warn, screen->first, screen->second - (big ? 62 : 16), 0.5, 1.0);
                     b.warn.show_passive();

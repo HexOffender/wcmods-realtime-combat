@@ -35,9 +35,9 @@ notice your cat, it pounces on one, or walks into one. Instead:
   in toward it as it comes down, up to 1.2 m (a heavy one 0.9 m), so an animal pacing just out of reach is hit.
 - **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
   cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
-  in with a wind-up you can see coming, a red **!** over it from the moment it starts to the blow (dodge or
-  block then), and after striking it's open for a moment before it backs off again. Hit one in its wind-up and
-  it reels.
+  in with a wind-up you can see coming, following your cat until the last moment, when it's committed: a red
+  **!** over it then says dodge or block now (a dodge then is safe right through the blow), and after striking
+  it's open for a moment before it backs off again. Hit one in its wind-up and it reels.
   - **Some guard** when you attack them from in front (a badger most, a fox often): a guarded hit does a fifth
     of its damage and fills the animal's **posture** (the gold bar under its health; a heavy attack fills it
     twice as fast). Full, its guard breaks and it reels, open to a riposte. Keep swinging at a guard and it

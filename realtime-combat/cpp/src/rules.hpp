@@ -420,8 +420,9 @@ namespace rtc
     // ------------------------------------------------------------------------------------------- the animals fight back
     // An animal's attack is its own default fight animation (Gameplay.Combat.Attack.Default, 4.3 s like your cat's: it
     // strikes at about 1.6 to 1.9 s, seen in game), played from `from` to `to` at `rate`, landing at `hit`: about 0.9 s
-    // of wind-up to see it coming (a red mark over it shows it: hud.hpp). What's the same for every animal is here; what
-    // differs by kind is its FoeProfile (below).
+    // of wind-up to see it coming, and a red mark over it for its last `commit` seconds (hud.hpp), when it's committed
+    // and a dodge is safe through the blow. What's the same for every animal is here; what differs by kind is its
+    // FoeProfile (below).
     struct FoeSpec
     {
         std::wstring_view tag = L"Gameplay.Combat.Attack.Default";
@@ -432,7 +433,8 @@ namespace rtc
         double leash = 2000;           // or than this from where it joined the fight,
         double give_up_after = 3;      // for this long: it goes back to roaming
         double stagger = 0.5;          // a hit in its wind-up stops the attack; it reels this long
-        double commit = 0.3;           // the last part of a wind-up it no longer turns to your cat (when to dodge)
+        double commit = 0.4;           // the last part of a wind-up: it no longer turns to or follows your cat, and the
+                                       // HUD's mark shows over it (when to dodge: the dodge's safe moment covers it)
         double quick = 0.45;           // a combo's second strike, or a counter, lands this long after it starts
         double combo_gap = 0.15;       // between a strike and a combo's second
         double punish = 0.7;           // after striking it stays open this long, then backs off
