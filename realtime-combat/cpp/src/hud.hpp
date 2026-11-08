@@ -32,6 +32,7 @@ namespace rtc::hud
     struct Bar
     {
         Widget bar, name, posture;
+        Widget warn;   // a red mark over it while its strike is coming (its wind-up): dodge or guard now
         bool big = false;
     };
     struct State
@@ -84,6 +85,9 @@ namespace rtc::hud
             s.canvas.add(b.posture).size(300, 8);
             b.posture.set_opacity(0.92f);
         }
+        b.warn = wcmods::ui::text(L"!", {.size = big ? 46.0f : 32.0f, .color = wcmods::UiColor::hex(L"#ff6b5a")});
+        s.canvas.add(b.warn).auto_size(true);
+        b.warn.hide();
         return b;
     }
 
@@ -104,6 +108,7 @@ namespace rtc::hud
         if (b.bar) b.bar.remove();
         if (b.name) b.name.remove();
         if (b.posture) b.posture.remove();
+        if (b.warn) b.warn.remove();
     }
 
     inline auto clear_bars() -> void
@@ -209,12 +214,23 @@ namespace rtc::hud
                 b.bar.hide();
                 if (b.name) b.name.hide();
                 if (b.posture) b.posture.hide();
+                if (b.warn) b.warn.hide();
                 continue;
             }
             b.bar.set_value(e.max > 0 ? e.health / e.max : 0);
             place(b.bar, screen->first, screen->second, 0.5, 1.0);
             b.bar.show_passive();
             ++shown;
+            // its strike coming: the mark over it from the start of its wind-up to the blow
+            if (b.warn)
+            {
+                if (foes::winding_up(animal))
+                {
+                    place(b.warn, screen->first, screen->second - (big ? 62 : 16), 0.5, 1.0);
+                    b.warn.show_passive();
+                }
+                else b.warn.hide();
+            }
             if (b.name)
             {
                 const std::wstring label = std::format(L"{}  ·  level {}", e.display.empty() ? display_name(e.model) : e.display, e.level);

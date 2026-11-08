@@ -108,6 +108,13 @@ namespace rtc::foes
     }
 
 
+    // Whether its strike is coming (its wind-up, a feint's hold included): the HUD marks it, the moment to dodge or guard.
+    inline auto winding_up(UObject* animal) -> bool
+    {
+        auto it = state().all.find(animal);
+        return it != state().all.end() && it->second.foe.state == FoeState::WindUp;
+    }
+
     // Its posture as a part of what breaks its guard (0 to 1), for the HUD; nullopt for an animal not fighting.
     inline auto posture(UObject* animal) -> std::optional<double>
     {

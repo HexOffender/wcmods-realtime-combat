@@ -83,15 +83,15 @@ def test_standing_still_goes_back(agent):
 
 
 def test_safe_then_not_and_stamina(agent):
-    """Nothing hurts your cat at its start; after 0.4 s it can be hurt again. It costs 15 stamina."""
+    """Nothing hurts your cat at its start; after 0.55 s it can be hurt again. It costs 15 stamina."""
     before, safe = h.get(agent, "dodges") or 0, h.get(agent, "dodge_safe_starts") or 0
     h.action(agent, "dodge_right")
     h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
     stamina = agent.lua("return Game.cat():stamina()")
-    # it was safe as it began (counted: 0.4 s is too short to be sure of catching it from here), and isn't now
+    # it was safe as it began (counted: 0.55 s is too short to be sure of catching it from here), and isn't now
     assert (h.get(agent, "dodge_safe_starts") or 0) == safe + 1
     assert 83 <= stamina <= 86, stamina
-    time.sleep(0.5)
+    time.sleep(0.7)
     assert h.get(agent, "dodge_safe") is False
 
 

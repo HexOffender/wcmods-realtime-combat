@@ -34,6 +34,7 @@ namespace rtc::attacks
         UObject* montage{};
         double elapsed = 0;
         bool landed = false;
+        double stepped = 0;           // cm this strike has stepped in (AttackSpec::step)
         std::optional<Attack> next;   // pressed during the last part of this one
         int made = 0, hits = 0, refused = 0;
         double damage_multiplier = 1;
@@ -81,6 +82,7 @@ namespace rtc::attacks
         s.now = a;
         s.elapsed = 0;
         s.landed = false;
+        s.stepped = 0;
         s.next.reset();
         wcmods::share("attack", sp.name);
         wcmods::share("attacks", ++s.made);
@@ -150,10 +152,31 @@ namespace rtc::attacks
         const AttackSpec& sp = spec(a);
         s.elapsed += dt;
         if (asked && *asked == Attack::Light && s.elapsed >= chain_from(sp)) s.next = Attack::Light;
+        UObject* me = wcmods::player();
+        UObject* target = lockon::locked();
+        // until it lands, a strike keeps facing what it's locked on to (an animal pacing round your cat walked out of
+        // the cone during the wind-up, and the blow missed)
+        if (target && !s.landed) game::turn_to(me, target);
         // a lunge carries your cat forward from a little before it lands to a little after (slid along the ground: the
         // game's movement doesn't move it while the animation plays)
         if (sp.lunge > 0 && s.elapsed >= hit_at(sp) - 0.25 && s.elapsed - dt < hit_at(sp) + 0.05)
-            if (auto yaw = game::facing(wcmods::player())) game::slide(wcmods::player(), *yaw, sp.lunge * dt);
+            if (auto yaw = game::facing(me)) game::slide(me, *yaw, sp.lunge * dt);
+        // a strike steps in over the last 0.3 s of its wind-up: toward what it's locked on to, as far as it needs (up
+        // to `step`) to bring it in reach (the animals pace just out of reach, and most blows fell short), or a short
+        // step forward with nothing locked
+        if (sp.step > 0 && !s.landed && s.elapsed >= hit_at(sp) - 0.3)
+        {
+            double gap = sp.step * 0.5 - s.stepped;
+            if (target)
+            {
+                auto at = game::at(me), them = game::at(target);
+                gap = at && them ? flat_distance(*at, *them) - (sp.reach - 40) : 0;
+            }
+            const double move = std::min({gap, sp.step - s.stepped, 500 * dt});
+            if (move > 0)
+                if (auto yaw = game::facing(me))
+                    if (game::slide(me, *yaw, move)) s.stepped += move;
+        }
         if (!s.landed && s.elapsed >= hit_at(sp))
         {
             s.landed = true;
