@@ -63,13 +63,7 @@ namespace rtc::blocking
         State& s = state();
         if (!s.guarding) return;
         UObject* me = wcmods::player();
-        if (me && s.montage && game::montage_on(me, s.montage))
-        {
-            // the pose is held by pausing the montage, and a paused montage never blends out when it's stopped: your
-            // cat stood frozen in its guard, unable to move (seen in play: a right click soft-locked the game)
-            game::resume_montage(me, s.montage);
-            game::stop_montage(me, s.montage, 0.2);
-        }
+        if (me && s.montage && game::montage_on(me, s.montage)) game::stop_montage(me, s.montage, 0.2);
         s.guarding = false;
         s.montage = nullptr;
         s.since_drop = 0;
@@ -84,7 +78,11 @@ namespace rtc::blocking
         const GuardSpec g = spec();
         if (UObject* target = lockon::locked()) game::turn_to(me, target);
         s.montage = game::play_from(me, g.guard_tag, g.guard_pose, 1.0);
-        if (s.montage) game::pause_montage(me, s.montage);
+        // held at its pose by a play rate of 0 (as the animals' guards are), NOT paused: a paused montage says it isn't
+        // playing, so it was never stopped, and the next attack's montage stopped it without a blend (the engine only
+        // blends out a playing one), leaving its pose on your cat for good: frozen in a crouch, unable to walk (the
+        // owner's soft lock, in play)
+        if (s.montage) game::set_montage_rate(me, s.montage, 0);
         s.guarding = true;
         // a guard raised again within half a second of dropping can't parry: tapping the key isn't a string of parries
         s.held_for = s.since_drop < 0.5 ? g.parry_window + 0.01 : 0;

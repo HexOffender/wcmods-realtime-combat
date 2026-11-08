@@ -161,6 +161,26 @@ def test_the_cat_walks_again_after_a_guard(agent):
     assert moved > 100, f"your cat walked {moved:.0f} units in a second after the guard dropped"
 
 
+def test_the_cat_walks_after_a_guard_and_an_attack(agent):
+    """A guard, then an attack: the guard's pose is gone with it, and your cat walks (a pose held by pausing its
+    montage stayed on for good once another montage stopped it: the cat stood frozen in a crouch)."""
+    h.passive(agent, True)
+    _block(agent, True)
+    h.until_value(agent, "guarding", True)
+    time.sleep(0.5)
+    _block(agent, False)
+    h.until_value(agent, "guarding", False)
+    agent.lua("Game.cat():setStamina(100) return true")
+    made = h.get(agent, "attacks") or 0
+    h.action(agent, "light")
+    h.until(agent, f'({h.MOD}.get("attacks") or 0) > {made}', 2, "the attack")
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+    time.sleep(0.5)
+    playing = agent.lua('return Game.get(Game.player(), "Mesh"):GetAnimInstance():IsAnyMontagePlaying()')
+    moved = _walks(agent)
+    assert moved > 100, f"your cat walked {moved:.0f} units in a second after a guard and an attack (a montage still on: {playing})"
+
+
 def test_right_mouse_blocks(agent):
     """The real right mouse button, held: your cat guards; let go, it doesn't, and your cat walks again. (The game
     also crouches on it; the guard pose covers that, your cat standing still.)"""
