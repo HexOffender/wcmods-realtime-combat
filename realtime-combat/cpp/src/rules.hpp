@@ -270,12 +270,13 @@ namespace rtc
         double damage;              // times the light attack's damage
         double push;                // how hard it pushes what it hits away (cm/s)
         double lunge;               // how fast it carries your cat forward as it strikes, for 0.3 s (cm/s, 0 for none)
+        bool wide;                  // a wide swing: lands on every animal in the cone; else on one (the target, or the nearest)
     };
     inline auto spec(Attack a) -> const AttackSpec&
     {
-        static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0};
-        static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0};
-        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700};
+        static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0, false};
+        static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0, true};
+        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700, false};
         switch (a)
         {
         case Attack::Light: return light;
@@ -303,6 +304,20 @@ namespace rtc
         if (flat_distance(me, them) > reach || std::abs(them.z - me.z) > 150) return false;
         if (flat_distance(me, them) < 40) return true;   // right on top of your cat
         return std::abs(turn(facing_yaw, yaw_to(me, them))) <= cone;
+    }
+    // Which of the animals in reach (`candidates`, nearest first) an attack lands on: all of them for a wide swing;
+    // else one, the one your cat's locked on to when it's in reach, otherwise the nearest. Indices into candidates.
+    inline auto struck(const AttackSpec& s, size_t candidates, std::optional<size_t> locked) -> std::vector<size_t>
+    {
+        std::vector<size_t> out;
+        if (candidates == 0) return out;
+        if (s.wide)
+        {
+            for (size_t i = 0; i < candidates; ++i) out.push_back(i);
+            return out;
+        }
+        out.push_back(locked && *locked < candidates ? *locked : 0);
+        return out;
     }
 
     // Your cat's damage: the light attack's grows with its level (23 at level 14), the others are multiples of it.

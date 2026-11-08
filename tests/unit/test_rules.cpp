@@ -186,6 +186,13 @@ static void attacks_are_quick_and_land_inside()
     // the light one is the quickest and cheapest; the heavy one the strongest and dearest
     CHECK(rtc::duration(rtc::spec(rtc::Attack::Light)) < rtc::duration(rtc::spec(rtc::Attack::Heavy)));
     CHECK(rtc::spec(rtc::Attack::Light).stamina < rtc::spec(rtc::Attack::Heavy).stamina);
+    // one animal a blow (the target when it's in reach, else the nearest); the heavy attack's wide swing all of them
+    CHECK(!rtc::spec(rtc::Attack::Light).wide && !rtc::spec(rtc::Attack::Lunge).wide && rtc::spec(rtc::Attack::Heavy).wide);
+    CHECK(rtc::struck(rtc::spec(rtc::Attack::Light), 3, std::nullopt) == std::vector<size_t>{0});
+    CHECK(rtc::struck(rtc::spec(rtc::Attack::Light), 3, 2) == std::vector<size_t>{2});
+    CHECK(rtc::struck(rtc::spec(rtc::Attack::Lunge), 3, 7) == std::vector<size_t>{0});   // locked on to one out of reach
+    CHECK(rtc::struck(rtc::spec(rtc::Attack::Heavy), 3, 1) == (std::vector<size_t>{0, 1, 2}));
+    CHECK(rtc::struck(rtc::spec(rtc::Attack::Light), 0, std::nullopt).empty());
     CHECK(rtc::cat_damage(rtc::Attack::Heavy, 14) > rtc::cat_damage(rtc::Attack::Light, 14));
     CHECK(near(rtc::cat_damage(rtc::Attack::Light, 14), 23.4));
     CHECK(near(rtc::cat_damage(rtc::Attack::Light, 14, 2.0), 46.8));

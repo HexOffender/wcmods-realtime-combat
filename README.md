@@ -19,7 +19,7 @@ notice your cat, it pounces on one, or walks into one. Instead:
 | **Next target** to the right or left | Mouse wheel up or down | D-pad right or left |
 | **Circle** round the target, locked on (a cat walks forward round it: it can't walk sideways) | A or D | Left stick, left or right |
 | **Light attack** (while running: a lunge forward) | F | RT |
-| **Heavy attack** | G | LT |
+| **Heavy attack**, a wide swing (every animal in front) | G | LT |
 | **Dodge** the way you're moving (standing still: back) | Left Alt | B |
 | **Block**, held; raised just before a hit lands: **parry** | Right mouse button | LB |
 | **Drink** from the flask | Z | D-pad up |
@@ -28,8 +28,9 @@ notice your cat, it pounces on one, or walks into one. Instead:
 - **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
   it, and none comes back while you act or for a moment after. An action needs at least half its cost.
 - **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge.
-- **Attacking:** a hit lands on every animal in front of your cat that it can see. A light attack pressed
-  as one lands follows it.
+- **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
+  to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
+  in front. A light attack pressed as one lands follows it.
 - **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
   cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
   in with a wind-up you can see coming, and after striking it's open for a moment before it backs off again.
