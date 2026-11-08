@@ -36,6 +36,11 @@ namespace rtc::game
     }
     // The same, for one whose class was kept when it was first seen: the very object, not another in its place.
     inline auto staying(UObject* o, UClass* was) -> bool { return o && was && wcmods::detail::object_staying(o, was); }
+    // And for an actor's component (a capsule): still there, and a component (not an actor in its place).
+    inline auto component_staying(UObject* o) -> bool
+    {
+        return o && wcmods::detail::object_staying(o, nullptr) && wcmods::is_a(o, STR("/Script/Engine.ActorComponent"));
+    }
 
     // The controller's rotation, which the camera follows.
     inline auto control_rotation() -> std::optional<Rot>
@@ -487,7 +492,9 @@ namespace rtc::game
         });
     }
 
-    // A montage's speed as it plays (0 holds it where it is; its own rate plays it on).
+    // A montage's speed as it plays (0 holds it where it is; its own rate plays it on). To hold a pose, this and not
+    // Montage_Pause: a paused montage says it isn't playing (Montage_IsPlaying), so nothing here stops it, and the next
+    // montage stops it without a blend, leaving its pose on the actor for good (guard.hpp).
     inline auto set_montage_rate(UObject* actor, UObject* montage, double rate) -> void
     {
         UObject* a = anim(actor);

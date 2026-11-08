@@ -9,6 +9,7 @@ button is tested too.
 
 Run as test_sandbox_gate.py says."""
 import ctypes
+import math
 import os
 import sys
 import time
@@ -137,10 +138,54 @@ def test_an_attack_drops_the_guard(agent):
     _block(agent, False)
 
 
+def _walks(agent):
+    """How far your cat walks forward in a second (its keys posted to the game)."""
+    start = agent.lua("local p = Game.cat():location() return { p.X, p.Y }")
+    agent.move(forward=1.0, seconds=1.0)
+    time.sleep(0.3)
+    end = agent.lua("local p = Game.cat():location() return { p.X, p.Y }")
+    return math.hypot(end[0] - start[0], end[1] - start[1])
+
+
+def test_the_cat_walks_again_after_a_guard(agent):
+    """The guard dropped, your cat walks as before: its pose (a montage held paused) is let go of (seen in play: a
+    right click left the cat frozen in its guard, the game soft-locked)."""
+    h.passive(agent, True)
+    _block(agent, True)
+    h.until_value(agent, "guarding", True)
+    time.sleep(0.5)
+    _block(agent, False)
+    h.until_value(agent, "guarding", False)
+    time.sleep(0.4)   # the blend out
+    moved = _walks(agent)
+    assert moved > 100, f"your cat walked {moved:.0f} units in a second after the guard dropped"
+
+
+def test_the_cat_walks_after_a_guard_and_an_attack(agent):
+    """A guard, then an attack: the guard's pose is gone with it, and your cat walks (a pose held by pausing its
+    montage stayed on for good once another montage stopped it: the cat stood frozen in a crouch)."""
+    h.passive(agent, True)
+    _block(agent, True)
+    h.until_value(agent, "guarding", True)
+    time.sleep(0.5)
+    _block(agent, False)
+    h.until_value(agent, "guarding", False)
+    agent.lua("Game.cat():setStamina(100) return true")
+    made = h.get(agent, "attacks") or 0
+    h.action(agent, "light")
+    h.until(agent, f'({h.MOD}.get("attacks") or 0) > {made}', 2, "the attack")
+    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+    time.sleep(0.5)
+    playing = agent.lua('return Game.get(Game.player(), "Mesh"):GetAnimInstance():IsAnyMontagePlaying()')
+    moved = _walks(agent)
+    assert moved > 100, f"your cat walked {moved:.0f} units in a second after a guard and an attack (a montage still on: {playing})"
+
+
 def test_right_mouse_blocks(agent):
-    """The real right mouse button, held: your cat guards; let go, it doesn't. (The game also crouches on it; the guard
-    pose covers that, your cat standing still.)"""
+    """The real right mouse button, held: your cat guards; let go, it doesn't, and your cat walks again. (The game
+    also crouches on it; the guard pose covers that, your cat standing still.)"""
     from wcmods.agent import window
+    h.passive(agent, True)
     hwnd = window.game_window()
     ctypes.windll.user32.PostMessageW(hwnd, 0x0204, 0x0002, (400 << 16) | 400)   # WM_RBUTTONDOWN
     try:
@@ -148,3 +193,6 @@ def test_right_mouse_blocks(agent):
     finally:
         ctypes.windll.user32.PostMessageW(hwnd, 0x0205, 0, (400 << 16) | 400)    # WM_RBUTTONUP
     h.until_value(agent, "guarding", False)
+    time.sleep(0.4)
+    moved = _walks(agent)
+    assert moved > 100, f"your cat walked {moved:.0f} units in a second after a right click"
