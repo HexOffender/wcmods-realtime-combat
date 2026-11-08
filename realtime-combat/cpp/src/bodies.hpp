@@ -79,8 +79,8 @@ namespace rtc::bodies
     inline auto give_back(UObject* animal, const Kept& k) -> void
     {
         if (!game::staying(animal)) return;
-        if (k.encounter && game::staying(k.encounter)) set_response(k.encounter, k.encounter_was);
-        if (k.body && game::staying(k.body)) set_response(k.body, k.body_was);
+        if (k.encounter && game::component_staying(k.encounter)) set_response(k.encounter, k.encounter_was);
+        if (k.body && game::component_staying(k.body)) set_response(k.body, k.body_was);
     }
 
     // Every frame while real-time combat is on: each animal set has a body that blocks while it's in a fight, and as it
@@ -91,7 +91,8 @@ namespace rtc::bodies
         int blocking = 0;
         for (auto& [animal, k] : s.set)
         {
-            if (!k.body || !game::staying(k.body)) continue;
+            // (its body is a component: staying() asks for an actor, and no body blocked after #18 until this asked right)
+            if (!k.body || !game::component_staying(k.body)) continue;
             const bool should = fighting(animal);
             if (should != k.blocking)
             {

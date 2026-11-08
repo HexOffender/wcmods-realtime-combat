@@ -36,6 +36,11 @@ namespace rtc::game
     }
     // The same, for one whose class was kept when it was first seen: the very object, not another in its place.
     inline auto staying(UObject* o, UClass* was) -> bool { return o && was && wcmods::detail::object_staying(o, was); }
+    // And for an actor's component (a capsule): still there, and a component (not an actor in its place).
+    inline auto component_staying(UObject* o) -> bool
+    {
+        return o && wcmods::detail::object_staying(o, nullptr) && wcmods::is_a(o, STR("/Script/Engine.ActorComponent"));
+    }
 
     // The controller's rotation, which the camera follows.
     inline auto control_rotation() -> std::optional<Rot>
