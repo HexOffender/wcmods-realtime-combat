@@ -56,6 +56,7 @@ namespace rtc::foes
         double reflee = 0;   // seconds to asking its run again
         double fled_dist = 0;   // fleeing: how far from your cat it was when last asked to run (no farther: its way's blocked)
         double flee_turn = 0;   // and the way it's turned off from straight away, degrees (a side, then the other)
+        bool flee_slides = false;   // its walk got it nowhere: slid along the ground this second instead
     };
     struct State
     {
@@ -403,6 +404,7 @@ namespace rtc::foes
                 e.reflee = 0;
                 e.fled_dist = 0;
                 e.flee_turn = 0;
+                e.flee_slides = false;
                 wcmods::share("fled", ++s.fled);
                 break;
             case FoeDo::GiveUp:
@@ -455,17 +457,19 @@ namespace rtc::foes
                 if (e.reflee <= 0)
                 {
                     e.reflee = 1.0;
-                    // straight away from your cat; got no farther since it was last asked (its way blocked: a rock, a
-                    // slope, the mesh's edge; seen in game, a rabbit standing against the hillside "fleeing"): off to
-                    // a side instead, the other side the next time
+                    // straight away from your cat; got no farther since it was last asked (its way blocked, or it's
+                    // off the mesh, pushed into a bush: seen in game, a rabbit standing in the bushes "fleeing"): off to
+                    // a side instead, the other side the next time, and slid along the ground, which needs no mesh
                     const bool stuck = e.fled_dist > 0 && dist < e.fled_dist + 50;
                     e.fled_dist = dist;
-                    double away = yaw_to(*at_me, *them);
-                    if (stuck) e.flee_turn = e.flee_turn <= 0 ? 70 : -e.flee_turn, away += e.flee_turn;
-                    const double r = away / degrees_per_radian;
+                    e.flee_slides = stuck;
+                    if (stuck) e.flee_turn = e.flee_turn <= 0 ? 70 : -e.flee_turn;
+                    else e.flee_turn = 0;
+                    const double r = (yaw_to(*at_me, *them) + e.flee_turn) / degrees_per_radian;
                     const wcmods::Vec3 from{them->x - std::cos(r) * 100, them->y - std::sin(r) * 100, them->z};
                     wcmods::flee(animal, from, 2500, wcmods::MoveOptions{.speed = e.profile.speed * 1.2, .radius = 80});
                 }
+                if (e.flee_slides) game::slide(animal, yaw_to(*at_me, *them) + e.flee_turn, e.profile.speed * 1.2 * dt);
                 break;
             default: break;
             }
