@@ -2,7 +2,7 @@
 // your cat's going; straight back, standing still):
 // the game's side hop (Animation.Combat.Dodge.Left/Right) to that side, or, forward and back, your cat turned so its
 // right hop goes that way, and slid along the ground while the hop's in the air (rules.hpp's DodgeSpec): 1.5 m, a cat's
-// hop, unless settings.json's dodge_distance_m says otherwise (0.5 to 5). For its first 0.4 s nothing hurts your cat
+// hop, unless settings.json's dodge_distance_m says otherwise (0.5 to 5). For its first 0.55 s nothing hurts your cat
 // (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an attack short once the attack has landed.
 //
 // Shared for tests: "dodge" (true while one plays), "dodges" (how many made), "dodge_safe" (true while nothing hurts

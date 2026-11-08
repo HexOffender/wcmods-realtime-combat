@@ -243,7 +243,7 @@ static void the_dodge()
     CHECK(rtc::duration(d) > 0.4 && rtc::duration(d) < 1.0);
     CHECK(rtc::slide_start(d) < rtc::slide_end(d) && rtc::slide_end(d) <= rtc::duration(d));
     CHECK(near(rtc::slide_speed(d) * (rtc::slide_end(d) - rtc::slide_start(d)), d.distance));
-    CHECK(rtc::safe_at(d, 0) && rtc::safe_at(d, 0.3) && !rtc::safe_at(d, 0.5) && !rtc::safe_at(d, -0.1));
+    CHECK(rtc::safe_at(d, 0) && rtc::safe_at(d, 0.5) && !rtc::safe_at(d, 0.6) && !rtc::safe_at(d, -0.1));
     // the way the player's moving, as the camera sees it; standing still, straight back
     CHECK(near(rtc::dodge_yaw(0, 50, 1, 0), 0));
     CHECK(near(rtc::dodge_yaw(0, 50, 0, 1), 90));
@@ -306,7 +306,7 @@ static void foes_hit_back()
     CHECK(rtc::step(f, s, plain, 0.5, 260, 0, true, 1, r) == rtc::FoeDo::StartAttack && f.state == rtc::FoeState::WindUp);
     CHECK(rtc::attacking(f) && near(f.strike_at, rtc::hit_at(s)) && near(f.hold, 0));
     CHECK(rtc::step(f, s, plain, 0.5, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);
-    CHECK(rtc::step(f, s, plain, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Land && f.state == rtc::FoeState::Recover);
+    CHECK(rtc::step(f, s, plain, rtc::hit_at(s) - 0.45, 150, 0, true, 1, r) == rtc::FoeDo::Land && f.state == rtc::FoeState::Recover);
     CHECK(rtc::step(f, s, plain, 0.3, 150, 0, true, 1, r) == rtc::FoeDo::Nothing);   // open: the time to hit it
     CHECK(rtc::step(f, s, plain, 0.5, 150, 0, true, 1, r) == rtc::FoeDo::Retreat && f.state == rtc::FoeState::Retreat);
     CHECK(near(f.cooldown, 3) && !rtc::attacking(f));

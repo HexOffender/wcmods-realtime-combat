@@ -27,15 +27,17 @@ notice your cat, it pounces on one, or walks into one. Instead:
 
 - **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
   it, and none comes back while you act or for a moment after. An action needs at least half its cost.
-- **Dodging:** your cat can't be hurt for the first 0.4 s of a dodge. A dodge takes it 1.5 m, a cat's hop
+- **Dodging:** your cat can't be hurt for the first 0.55 s of a dodge. A dodge takes it 1.5 m, a cat's hop
   (`dodge_distance_m` in the settings, 0.5 to 5).
 - **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
   to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
-  in front. A light attack pressed as one lands follows it.
+  in front. A light attack pressed as one lands follows it. Locked on, a strike keeps facing its target and steps
+  in toward it as it comes down, up to 1.2 m (a heavy one 0.9 m), so an animal pacing just out of reach is hit.
 - **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
   cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
-  in with a wind-up you can see coming, and after striking it's open for a moment before it backs off again.
-  Hit one in its wind-up and it reels.
+  in with a wind-up you can see coming, following your cat until the last moment, when it's committed: a red
+  **!** over it then says dodge or block now (a dodge then is safe right through the blow), and after striking
+  it's open for a moment before it backs off again. Hit one in its wind-up and it reels.
   - **Some guard** when you attack them from in front (a badger most, a fox often): a guarded hit does a fifth
     of its damage and fills the animal's **posture** (the gold bar under its health; a heavy attack fills it
     twice as fast). Full, its guard breaks and it reels, open to a riposte. Keep swinging at a guard and it

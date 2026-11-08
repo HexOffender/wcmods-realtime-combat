@@ -137,10 +137,10 @@ def test_it_backs_off_after_striking(agent):
 
 
 def test_a_dodge_avoids_it(agent):
-    """A dodge back as its wind-up starts: 3 m away (or still in the dodge's safe moment) when it lands, your cat takes
-    nothing. (Timing a dodge for the last moment of the wind-up from here is too tight: reading the game takes a
-    while.)"""
+    """A dodge back a third of a second into its wind-up (about when the HUD's mark comes up): your cat's still in the
+    dodge's safe moment (0.55 s) when the blow lands at 0.88 s, and takes nothing."""
     _until_foe(agent, "near", "windup", 12)
+    time.sleep(0.3)
     h.action(agent, "dodge_back")
     before, hits = _health(agent), h.get(agent, "cat_hits") or 0
     _until_foe(agent, "near", ("retreat", "pace", "approach"), 4)
@@ -252,8 +252,10 @@ def test_losing_prey_runs(agent):
         time.sleep(0.2)
     assert (h.get(agent, "fled") or 0) > fled, "it never ran"
     start = _distance(agent, "near")
-    time.sleep(1.5)
-    assert _distance(agent, "near") > start + 150, "it isn't getting away"
+    end = time.time() + 3
+    while time.time() < end and _distance(agent, "near") <= start + 150:
+        time.sleep(0.2)
+    assert _distance(agent, "near") > start + 150, f"it isn't getting away ({start:.0f} to {_distance(agent, 'near'):.0f})"
 
 
 def test_defeat_feeds_the_clan(agent):

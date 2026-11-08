@@ -270,13 +270,15 @@ namespace rtc
         double damage;              // times the light attack's damage
         double push;                // how hard it pushes what it hits away (cm/s)
         double lunge;               // how fast it carries your cat forward as it strikes, for 0.3 s (cm/s, 0 for none)
+        double step;                // how far it steps in toward what it's locked on to, at most, to bring it in reach (cm;
+                                    // half that forward with nothing locked; 0 for none)
         bool wide;                  // a wide swing: lands on every animal in the cone; else on one (the target, or the nearest)
     };
     inline auto spec(Attack a) -> const AttackSpec&
     {
-        static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0, false};
-        static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0, true};
-        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700, false};
+        static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0, 120, false};
+        static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0, 90, true};
+        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700, 0, false};
         switch (a)
         {
         case Attack::Light: return light;
@@ -379,7 +381,7 @@ namespace rtc
         double from = 0.25, to = 1.15, rate = 1.4;
         double slide_from = 0.35, slide_to = 0.85;
         double distance = 150;   // cm it slides (dodge.hpp takes it from settings.json's dodge_distance_m)
-        double safe = 0.4;
+        double safe = 0.55;      // real seconds from the press in which nothing hurts your cat
         double stamina = 15;
     };
     inline auto duration(const DodgeSpec& s) -> double { return (s.to - s.from) / s.rate; }
@@ -417,19 +419,22 @@ namespace rtc
 
     // ------------------------------------------------------------------------------------------- the animals fight back
     // An animal's attack is its own default fight animation (Gameplay.Combat.Attack.Default, 4.3 s like your cat's: it
-    // strikes at about 1.6 to 1.9 s, seen in game), played from `from` to `to`, landing at `hit`: about 0.75 s of wind-up
-    // to see it coming. What's the same for every animal is here; what differs by kind is its FoeProfile (below).
+    // strikes at about 1.6 to 1.9 s, seen in game), played from `from` to `to` at `rate`, landing at `hit`: about 0.9 s
+    // of wind-up to see it coming, and a red mark over it for its last `commit` seconds (hud.hpp), when it's committed
+    // and a dodge is safe through the blow. What's the same for every animal is here; what differs by kind is its
+    // FoeProfile (below).
     struct FoeSpec
     {
         std::wstring_view tag = L"Gameplay.Combat.Attack.Default";
-        double from = 1.0, to = 2.2, hit = 1.75, rate = 1.0;
+        double from = 1.0, to = 2.2, hit = 1.75, rate = 0.85;
         double reach = 170, cone = 60;
         double engage = 400;           // an animal this near your cat joins the fight (cm)
         double give_up_range = 2500;   // farther than this from your cat,
         double leash = 2000;           // or than this from where it joined the fight,
         double give_up_after = 3;      // for this long: it goes back to roaming
         double stagger = 0.5;          // a hit in its wind-up stops the attack; it reels this long
-        double commit = 0.3;           // the last part of a wind-up it no longer turns to your cat (when to dodge)
+        double commit = 0.4;           // the last part of a wind-up: it no longer turns to or follows your cat, and the
+                                       // HUD's mark shows over it (when to dodge: the dodge's safe moment covers it)
         double quick = 0.45;           // a combo's second strike, or a counter, lands this long after it starts
         double combo_gap = 0.15;       // between a strike and a combo's second
         double punish = 0.7;           // after striking it stays open this long, then backs off
@@ -451,7 +456,7 @@ namespace rtc
         static const FoeSpec s = [] {
             FoeSpec f;
             f.tag = L"Gameplay.Combat.Attack.Universal.2";
-            f.from = 1.0, f.to = 1.95, f.hit = 1.5, f.rate = 1.0;
+            f.from = 1.0, f.to = 1.95, f.hit = 1.5, f.rate = 0.85;
             return f;
         }();
         return s;

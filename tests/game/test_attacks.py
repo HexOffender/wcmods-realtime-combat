@@ -158,3 +158,21 @@ def test_the_real_keys(agent):
         h.until(agent, f'({h.MOD}.get("attacks") or 0) > {before}', 2, f"{key} to attack")
         assert h.get(agent, "attack") == name
         h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+
+
+def test_a_strike_steps_in_to_reach(agent):
+    """Locked on to a rabbit just out of reach (2.9 m, where the animals pace), a light attack steps in as it comes
+    down and lands; your cat ends up to 1.2 m nearer. (A new scene: last in this file.)"""
+    IDS.clear()
+    IDS.update(h.scene(agent, {"far": (0, 290), "behind": (180, 160)}))
+    agent.lua("Game.cat():setStamina(100) return true")
+    h.action(agent, "lock")
+    h.until_value(agent, "target", IDS["far"])
+    hp = _hp(agent, "far")
+    start = agent.lua("local p = Game.cat():location() return { p.X, p.Y }")
+    _attack(agent, "light")
+    end = agent.lua("local p = Game.cat():location() return { p.X, p.Y }")
+    moved = ((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5
+    h.action(agent, "lock")
+    assert _hp(agent, "far") < hp, f"the strike missed the rabbit 2.9 m off (it has {_hp(agent, 'far')} of {hp})"
+    assert 60 < moved < 160, f"your cat stepped {moved:.0f} units"

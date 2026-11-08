@@ -83,15 +83,15 @@ def test_standing_still_goes_back(agent):
 
 
 def test_safe_then_not_and_stamina(agent):
-    """Nothing hurts your cat at its start; after 0.4 s it can be hurt again. It costs 15 stamina."""
+    """Nothing hurts your cat at its start; after 0.55 s it can be hurt again. It costs 15 stamina."""
     before, safe = h.get(agent, "dodges") or 0, h.get(agent, "dodge_safe_starts") or 0
     h.action(agent, "dodge_right")
     h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
     stamina = agent.lua("return Game.cat():stamina()")
-    # it was safe as it began (counted: 0.4 s is too short to be sure of catching it from here), and isn't now
+    # it was safe as it began (counted: 0.55 s is too short to be sure of catching it from here), and isn't now
     assert (h.get(agent, "dodge_safe_starts") or 0) == safe + 1
     assert 83 <= stamina <= 86, stamina
-    time.sleep(0.5)
+    time.sleep(0.7)
     assert h.get(agent, "dodge_safe") is False
 
 
@@ -109,11 +109,13 @@ def test_a_wall_stops_it(agent):
 
 
 def test_too_little_stamina(agent):
-    agent.lua("Game.cat():setStamina(0) return true")
+    """With no stamina the dodge is refused. (The stamina's set to none and the dodge asked in one call: it comes back
+    at 20 a second, and a few round trips later there'd be enough for half the cost.)"""
     refused, made = h.get(agent, "dodge_refused") or 0, h.get(agent, "dodges") or 0
-    h.action(agent, "dodge_right")
-    time.sleep(0.2)
-    assert (h.get(agent, "dodge_refused") or 0) == refused + 1 and (h.get(agent, "dodges") or 0) == made
+    agent.lua(f'Game.cat():setStamina(0) WCModsCpp.share("RealtimeCombat.action", "dodge_right {next(h._count)}") return true')
+    time.sleep(0.3)
+    assert (h.get(agent, "dodge_refused") or 0) == refused + 1 and (h.get(agent, "dodges") or 0) == made, \
+        (h.get(agent, "dodge_refused"), refused, h.get(agent, "dodges"), made)
     agent.lua("Game.cat():setStamina(100) return true")
 
 

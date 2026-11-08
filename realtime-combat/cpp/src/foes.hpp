@@ -54,6 +54,9 @@ namespace rtc::foes
         UObject* montage{};  // its attack or guard animation playing
         double repace = 0;   // seconds to its next pacing step
         double reflee = 0;   // seconds to asking its run again
+        double fled_dist = 0;   // fleeing: how far from your cat it was when last asked to run (no farther: its way's blocked)
+        double flee_turn = 0;   // and the way it's turned off from straight away, degrees (a side, then the other)
+        bool flee_slides = false;   // its walk got it nowhere: slid along the ground this second instead
     };
     struct State
     {
@@ -107,6 +110,16 @@ namespace rtc::foes
         return game::clan_cat(actor) ? cat_foe_spec() : animal;
     }
 
+
+    // Whether its blow is about to land: the last `commit` seconds of its wind-up (after a feint's hold), when it's
+    // committed to where it strikes. The HUD marks it: the moment to dodge or guard.
+    inline auto striking_soon(UObject* animal) -> bool
+    {
+        auto it = state().all.find(animal);
+        if (it == state().all.end() || it->second.foe.state != FoeState::WindUp) return false;
+        const Foe& f = it->second.foe;
+        return f.t >= f.strike_at - spec_for(animal).commit;
+    }
 
     // Its posture as a part of what breaks its guard (0 to 1), for the HUD; nullopt for an animal not fighting.
     inline auto posture(UObject* animal) -> std::optional<double>
@@ -389,6 +402,9 @@ namespace rtc::foes
                 stop_animation(animal, e, 0.2);
                 wcmods::stop_following(animal, false);
                 e.reflee = 0;
+                e.fled_dist = 0;
+                e.flee_turn = 0;
+                e.flee_slides = false;
                 wcmods::share("fled", ++s.fled);
                 break;
             case FoeDo::GiveUp:
@@ -412,15 +428,18 @@ namespace rtc::foes
                 break;
             case FoeState::WindUp:
             {
-                // early on it turns to your cat and rushes in to striking range; the last moment it's committed (dodge
-                // then); held in a feint, it keeps watching
+                // early on it turns to your cat and rushes in to striking range, following it; the last moment it's
+                // committed (dodge then): it neither turns to your cat nor follows it, its rush going straight on (a
+                // dodge aside or back takes your cat out of the blow). Held in a feint, it keeps watching.
                 const double committed = e.foe.quick ? e.foe.strike_at - spec.commit : commit_at(spec);
-                if (e.foe.t < committed || (e.foe.held && e.foe.t < e.foe.hold_at + e.foe.hold)) wcmods::face(animal, me);
+                const bool watching = e.foe.t < committed || (e.foe.held && e.foe.t < e.foe.hold_at + e.foe.hold);
+                if (watching) wcmods::face(animal, me);
                 if (dist > e.profile.attack_range && !e.foe.landed)
                 {
                     const double left = std::max(0.15, e.foe.strike_at - e.foe.t - 0.05);
                     const double gap = dist - e.profile.attack_range;
-                    game::slide(animal, yaw_to(*them, *at_me), std::min({gap / left * dt, 700 * dt, gap}));
+                    if (watching) game::slide(animal, yaw_to(*them, *at_me), std::min({gap / left * dt, 700 * dt, gap}));
+                    else if (auto facing = game::facing(animal)) game::slide(animal, *facing, std::min(gap, 500 * dt));
                 }
                 break;
             }
@@ -438,8 +457,19 @@ namespace rtc::foes
                 if (e.reflee <= 0)
                 {
                     e.reflee = 1.0;
-                    wcmods::flee(animal, me, 2500, wcmods::MoveOptions{.speed = e.profile.speed * 1.2, .radius = 80});
+                    // straight away from your cat; got no farther since it was last asked (its way blocked, or it's
+                    // off the mesh, pushed into a bush: seen in game, a rabbit standing in the bushes "fleeing"): off to
+                    // a side instead, the other side the next time, and slid along the ground, which needs no mesh
+                    const bool stuck = e.fled_dist > 0 && dist < e.fled_dist + 50;
+                    e.fled_dist = dist;
+                    e.flee_slides = stuck;
+                    if (stuck) e.flee_turn = e.flee_turn <= 0 ? 70 : -e.flee_turn;
+                    else e.flee_turn = 0;
+                    const double r = (yaw_to(*at_me, *them) + e.flee_turn) / degrees_per_radian;
+                    const wcmods::Vec3 from{them->x - std::cos(r) * 100, them->y - std::sin(r) * 100, them->z};
+                    wcmods::flee(animal, from, 2500, wcmods::MoveOptions{.speed = e.profile.speed * 1.2, .radius = 80});
                 }
+                if (e.flee_slides) game::slide(animal, yaw_to(*at_me, *them) + e.flee_turn, e.profile.speed * 1.2 * dt);
                 break;
             default: break;
             }
