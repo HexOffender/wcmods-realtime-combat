@@ -125,8 +125,9 @@ namespace rtc::lockon
         {
             auto where = game::at(a.actor);
             if (!where || enemies::defeated(a.actor)) continue;
-            // a Clan life cat only once it's fighting your cat, or Clan life marks it hostile: not every clanmate about
-            if (game::clan_cat(a.actor) && !enemies::known(a.actor) && !game::hostile(a.actor)) continue;
+            // a Clan life cat only once it's fighting your cat, or Clan life marks it hostile (and your cat hasn't just
+            // spared it): not every clanmate about
+            if (game::clan_cat(a.actor) && !enemies::known(a.actor) && (!game::hostile(a.actor) || enemies::recently_spared(a.actor))) continue;
             out.push_back({a.actor, Candidate{game::id(a.actor), *where, game::can_see(a.actor)}});
         }
         return out;

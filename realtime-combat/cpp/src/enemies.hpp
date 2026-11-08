@@ -41,6 +41,7 @@ namespace rtc::enemies
     struct State
     {
         std::map<UObject*, Enemy> all;
+        std::map<UObject*, double> spared;   // cats your cat spared (cats.hpp): seconds left in which nothing sets them on it
         int defeated = 0, ripostes = 0;
         double health_multiplier = 1;
         std::function<void(UObject*, const struct Enemy&)> on_yield;   // cats.hpp's
@@ -139,6 +140,13 @@ namespace rtc::enemies
         all.erase(it);
     }
 
+    // A cat spared after yielding (cats.hpp): for half a minute nothing sets it on your cat again by itself, not even
+    // Clan life naming it hostile (a beaten cat keeps to its den once Clan life hears, and this covers the moment
+    // between; a blow of your cat's own would start it again).
+    inline constexpr double spared_grace = 30.0;
+    inline auto spared(UObject* cat) -> void { state().spared[cat] = spared_grace; }
+    inline auto recently_spared(UObject* cat) -> bool { return state().spared.contains(cat); }
+
     // One of your cat's own blows landed on it (attacks.hpp; the party's aren't counted).
     inline auto count_yours(UObject* animal) -> void
     {
@@ -232,6 +240,12 @@ namespace rtc::enemies
     // of animals that went (taken out, a level gone) forgotten.
     inline auto frame(double dt) -> void
     {
+        for (auto it = state().spared.begin(); it != state().spared.end();)
+        {
+            it->second -= dt;
+            if (it->second <= 0 || !game::staying(it->first)) it = state().spared.erase(it);
+            else ++it;
+        }
         auto& all = state().all;
         for (auto it = all.begin(); it != all.end();)
         {
@@ -268,5 +282,6 @@ namespace rtc::enemies
             unshare(animal);
         }
         state().all.clear();
+        state().spared.clear();
     }
 } // namespace rtc::enemies

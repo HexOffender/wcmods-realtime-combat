@@ -2,7 +2,8 @@
 // ("ClanLife.cat"); they fight as cats (rules.hpp's "cat" profiles and the cats' quick claw), and a cat beaten doesn't
 // vanish as an animal does: it yields (enemies.hpp), down and waiting. Then it's your choice: the finish key (H, or the
 // d-pad's down) within reach gives the killing blow, the worst thing a warrior can do to a beaten foe (Clan life judges
-// it: Part E); walking away (7 m), or leaving it be a while, spares it.
+// it: Part E); walking away (7 m), or leaving it be a while, spares it. A spared cat isn't set on your cat again for
+// half a minute (enemies.hpp's spared), hostile or not: Clan life keeps a beaten cat to its den meanwhile.
 //
 // Clan life hears it all through two shared values:
 //   RealtimeCombat.fighting    the names of the cats in a fight with your cat or yielded to it, and of your party's cats
@@ -112,10 +113,11 @@ namespace rtc::cats
         return best;
     }
 
-    // Let it go: up again, whole, Clan life's once more.
+    // Let it go: up again, whole, Clan life's once more; not set on your cat again at once (enemies::spared).
     inline auto spare(UObject* cat, Down& d) -> void
     {
         if (game::staying(cat)) wcmods::stop_move(cat, 0.4);
+        enemies::spared(cat);
         enemies::forget_yielded(cat);
         tell("spared", d.id, d.name);
     }

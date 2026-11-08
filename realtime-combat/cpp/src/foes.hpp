@@ -307,9 +307,10 @@ namespace rtc::foes
             {
                 for (const wcmods::Animal& a : game::animals(s.engage))
                     if (!enemies::defeated(a.actor)) engage(a.actor);
-                // a Clan life cat only by itself when Clan life marks it hostile; the rest when your cat strikes them
+                // a Clan life cat only by itself when Clan life marks it hostile (and your cat hasn't just spared it);
+                // the rest when your cat strikes them
                 for (const wcmods::Animal& c : game::cats(s.engage))
-                    if (game::hostile(c.actor) && !enemies::defeated(c.actor)) engage(c.actor);
+                    if (game::hostile(c.actor) && !enemies::defeated(c.actor) && !enemies::recently_spared(c.actor)) engage(c.actor);
             }
             for (UObject* hit : enemies::hit_animals())
                 if (!enemies::defeated(hit)) engage(hit);
