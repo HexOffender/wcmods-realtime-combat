@@ -1,8 +1,9 @@
 // attacks.hpp: step 3, your cat's attacks. F is a light attack (the fights' Quick Claw), G a heavy one (Strong Claw),
 // F while running a lunge (Jump Attack) that carries your cat forward. Each plays the strike of its animation
 // (rules.hpp's spec()), costs the game's own stamina, turns your cat to the animal it's locked on to, and at the
-// moment it lands hits every animal in a cone in front that your cat can see (enemies.hpp). A light attack pressed
-// once one has landed follows it.
+// moment it lands hits one animal in front that your cat can see: the one it's locked on to, else the nearest
+// (enemies.hpp). The heavy attack is a wide swing and hits every animal in the cone. A light attack pressed once one
+// has landed follows it.
 //
 // Shared for tests: "attack" (the one playing: "light", "heavy", "lunge", or ""), "attacks" (how many made),
 // "hits" (how many animals hit), "last_hit" (the last one's address), "refused" (attacks not made for want of
@@ -14,6 +15,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "enemies.hpp"
 #include "game.hpp"
@@ -95,7 +97,8 @@ namespace rtc::attacks
         wcmods::share("attack", "");
     }
 
-    // The moment it lands: every animal (and Clan life cat) in the cone in front of your cat, within reach.
+    // The moment it lands: on one animal (or Clan life cat) in reach in front of your cat, the one it's locked on to or
+    // else the nearest; a wide swing (the heavy attack) on every one in the cone.
     inline auto land(Attack a) -> void
     {
         State& s = state();
@@ -106,18 +109,26 @@ namespace rtc::attacks
         const AttackSpec& sp = spec(a);
         int32_t* level = wcmods::cat().level();
         const double damage = cat_damage(a, level ? *level : 1, s.damage_multiplier);
+        std::vector<UObject*> candidates;   // in reach, nearest first (game::fighters sorts by distance)
+        std::optional<size_t> locked;
         for (const wcmods::Animal& animal : game::fighters(sp.reach + 200))
         {
             if (enemies::defeated(animal.actor)) continue;
             auto them = game::at(animal.actor);
             if (!them || !in_reach(*at, *yaw, *them, sp.reach, sp.cone) || !game::can_see(animal.actor)) continue;
-            const double part = s.on_land ? s.on_land(animal.actor, a, *at) : 1;
+            if (animal.actor == lockon::locked()) locked = candidates.size();
+            candidates.push_back(animal.actor);
+        }
+        for (size_t i : struck(sp, candidates.size(), locked))
+        {
+            UObject* actor = candidates[i];
+            const double part = s.on_land ? s.on_land(actor, a, *at) : 1;
             if (part <= 0) continue;   // it hopped out of reach, or its guard broke (it reels, open)
             // through its guard: a part of the damage, and no flinch or push
-            enemies::hit(animal.actor, damage * part, *at, part < 1 ? 0 : sp.push, part >= 1);
-            enemies::count_yours(animal.actor);
+            enemies::hit(actor, damage * part, *at, part < 1 ? 0 : sp.push, part >= 1);
+            enemies::count_yours(actor);
             wcmods::share("hits", ++s.hits);
-            wcmods::share("last_hit", static_cast<double>(game::id(animal.actor)));
+            wcmods::share("last_hit", static_cast<double>(game::id(actor)));
         }
     }
 

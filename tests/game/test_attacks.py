@@ -1,5 +1,5 @@
 """Step 3, attacks (docs/plan.md): F a light attack, G a heavy one, a lunge while running. Each plays its strike, costs
-stamina, and hits the animals in a cone in front of your cat when it lands; the animal's health (the mod's own) goes
+stamina, and when it lands hits one animal in front of your cat (the heavy attack, a wide swing, every one); the animal's health (the mod's own) goes
 down by the rules' damage, and at none left it plays its "lose" animation and is taken away. A light attack pressed
 near the end of one follows it; with no stamina, none is made. Rabbits are put out held still: one in front of your
 cat, one behind.
