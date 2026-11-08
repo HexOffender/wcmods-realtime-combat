@@ -37,6 +37,9 @@ def setup(agent):
     if h.get(agent, "locked"):
         h.action(agent, "lock")
     IDS.clear()
+    # a fight needs level ground farther out than the rabbit's place: it paces, retreats and is pushed 3 to 7 m off,
+    # and down the slope by the den it's out of sight (the lock lets it go): face a way that's level out to 7 m first
+    h.scene(agent, {"near": (0, 300), "beyond": (0, 700)}, spawn=False)
     IDS.update(h.scene(agent, PLACES))
     agent.lua("Game.cat():heal() Game.cat():setStamina(100) return true")
     h.passive(agent, False)
@@ -83,6 +86,9 @@ def _distance(agent, name):
 def _lock(agent):
     h.action(agent, "lock")
     h.until_value(agent, "target", IDS["near"])
+    assert h.get(agent, "target") == IDS["near"], \
+        f"the lock didn't take the rabbit: locked {h.get(agent, 'locked')!r}, target {h.get(agent, 'target')!r}, " \
+        f"rabbit {IDS['near']}, {_distance(agent, 'near'):.0f} cm off, its foe state {_foe(agent, 'near')!r}"
 
 
 def _step_in(agent, name, to=150):
@@ -255,15 +261,22 @@ def test_defeat_feeds_the_clan(agent):
     agent.lua("Game.freshKill.set(40) return true")
     _lock(agent)
     defeated = h.get(agent, "defeated") or 0
+    tries = []   # each attack: the distance and its state before, then the hits and its health after
     for _ in range(14):
         agent.lua("Game.cat():setStamina(100) Game.cat():heal() return true")
         _step_in(agent, "near", 140)
+        if h.get(agent, "target") != IDS["near"]:   # let go (out of sight two seconds, pushed down the slope): as a player would
+            _lock(agent)
+        before = (round(_distance(agent, "near")), _foe(agent, "near"), h.get(agent, "hits") or 0)
         h.action(agent, "heavy")
         h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+        tries.append(before + ((h.get(agent, "hits") or 0) - before[2], _hp(agent, "near")))
         if (h.get(agent, "defeated") or 0) > defeated:
             break
         time.sleep(0.3)
-    assert (h.get(agent, "defeated") or 0) > defeated, "the rabbit wasn't beaten in fourteen heavy attacks"
+    assert (h.get(agent, "defeated") or 0) > defeated, \
+        f"the rabbit wasn't beaten in fourteen heavy attacks (locked {h.get(agent, 'locked')!r} on {h.get(agent, 'target')!r}, " \
+        f"rabbit {IDS['near']}; each try: cm off, state, hits before, hits landed, hp after: {tries})"
     pile = agent.lua("return Game.freshKill.value()")
     assert h.get(agent, "fresh_kill_given") == 5
     assert 43.5 <= pile <= 45.5, f"the fresh-kill pile is {pile}, not 45 (or a little less: it goes down on its own)"

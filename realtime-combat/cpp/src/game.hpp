@@ -14,6 +14,7 @@
 
 namespace rtc::game
 {
+    using wcmods::UClass;
     using wcmods::UObject;
 
     inline auto vec(wcmods::Vec3 v) -> Vec { return {v.x, v.y, v.z}; }
@@ -26,8 +27,15 @@ namespace rtc::game
         return vec(*l);
     }
 
-    // Whether an object is still there: not destroyed, not left behind by a level that went.
-    inline auto staying(UObject* o) -> bool { return o && wcmods::detail::object_staying(o, nullptr); }
+    // Whether an actor is still there: not destroyed, not left behind by a level that went, and still an actor (the
+    // engine gives a gone object's slot, and its memory, to the next object made: a cat Clan life took out of the world
+    // came back as something else under a kept pointer, and asking it where it was crashed the game).
+    inline auto staying(UObject* o) -> bool
+    {
+        return o && wcmods::detail::object_staying(o, nullptr) && wcmods::is_a(o, STR("/Script/Engine.Actor"));
+    }
+    // The same, for one whose class was kept when it was first seen: the very object, not another in its place.
+    inline auto staying(UObject* o, UClass* was) -> bool { return o && was && wcmods::detail::object_staying(o, was); }
 
     // The controller's rotation, which the camera follows.
     inline auto control_rotation() -> std::optional<Rot>
@@ -238,9 +246,14 @@ namespace rtc::game
     // (several a second made the game stutter), so the mod does it at most twice a second, for those within 5,000
     // units, and everything in it shares that list: animals(radius) gives those within `radius` now (along the ground,
     // as wcmods::animals measures), nearest first.
+    struct Cached
+    {
+        wcmods::Animal animal;
+        UClass* cls{};   // its class when found: the list is half a second old, and an actor gone meanwhile may be another object by now
+    };
     struct Near
     {
-        std::vector<wcmods::Animal> all;
+        std::vector<Cached> all;
         double age = 1e9;   // seconds since the search
     };
     inline auto near_state() -> Near&
@@ -252,7 +265,7 @@ namespace rtc::game
     // "ClanLife.name.<name>"), looked for twice a second like the animals.
     struct NearCats
     {
-        std::vector<wcmods::Animal> all;
+        std::vector<Cached> all;
         double age = 1e9;
     };
     inline auto near_cats() -> NearCats&
@@ -317,15 +330,21 @@ namespace rtc::game
         Near& n = near_state();
         if (n.age > 0.5)
         {
-            n.all = wcmods::animals(5000);
+            n.all.clear();
+            for (wcmods::Animal& a : wcmods::animals(5000))
+            {
+                UClass* cls = a.actor ? a.actor->GetClassPrivate() : nullptr;
+                n.all.push_back({std::move(a), cls});
+            }
             n.age = 0;
         }
         std::vector<wcmods::Animal> out;
         auto me = at(wcmods::player());
         if (!me) return out;
-        for (const wcmods::Animal& a : n.all)
+        for (const Cached& c : n.all)
         {
-            if (!staying(a.actor)) continue;
+            const wcmods::Animal& a = c.animal;
+            if (!staying(a.actor, c.cls)) continue;
             auto where = at(a.actor);
             if (!where) continue;
             const double d = flat_distance(*me, *where);
@@ -350,16 +369,17 @@ namespace rtc::game
             {
                 if (!clan_cat(c.actor)) continue;
                 const std::wstring rank = cat_tag(c.actor, L"ClanLife.rank.");
-                n.all.push_back({.actor = c.actor, .kind = rank, .model = cat_model(rank)});
+                n.all.push_back({{.actor = c.actor, .kind = rank, .model = cat_model(rank)}, c.actor->GetClassPrivate()});
             }
             n.age = 0;
         }
         std::vector<wcmods::Animal> out;
         auto me = at(wcmods::player());
         if (!me) return out;
-        for (const wcmods::Animal& a : n.all)
+        for (const Cached& c : n.all)
         {
-            if (!staying(a.actor) || allies().contains(a.actor)) continue;
+            const wcmods::Animal& a = c.animal;
+            if (!staying(a.actor, c.cls) || allies().contains(a.actor)) continue;
             auto where = at(a.actor);
             if (!where) continue;
             const double d = flat_distance(*me, *where);

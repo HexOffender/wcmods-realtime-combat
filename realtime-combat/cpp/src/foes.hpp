@@ -42,6 +42,7 @@
 
 namespace rtc::foes
 {
+    using wcmods::UClass;
     using wcmods::UObject;
 
     struct Entry
@@ -49,6 +50,7 @@ namespace rtc::foes
         Foe foe;
         FoeProfile profile;
         Vec home;            // where it joined the fight
+        UClass* cls{};       // its class as it joined: the very animal, not another the engine put in its place
         UObject* montage{};  // its attack or guard animation playing
         double repace = 0;   // seconds to its next pacing step
         double reflee = 0;   // seconds to asking its run again
@@ -125,6 +127,7 @@ namespace rtc::foes
         State& s = state();
         if (s.all.contains(animal) || enemies::defeated(animal)) return;
         Entry e;
+        e.cls = animal->GetClassPrivate();
         e.profile = profile(enemies::of(animal).model);
         e.foe.cooldown = 0.8 + 1.2 * roll();   // a moment's look at your cat before the first attack
         if (auto where = game::at(animal)) e.home = *where;
@@ -141,7 +144,7 @@ namespace rtc::foes
         State& s = state();
         auto it = s.all.find(animal);
         if (it == s.all.end()) return;
-        if (game::staying(animal))
+        if (game::staying(animal, it->second.cls))
         {
             stop_animation(animal, it->second, 0.2);
             wcmods::stop_following(animal, false);
@@ -325,7 +328,7 @@ namespace rtc::foes
             auto found = s.all.find(animal);
             if (found == s.all.end()) continue;   // let go while this loop ran
             Entry& e = found->second;
-            if (!game::staying(animal) || enemies::defeated(animal))
+            if (!game::staying(animal, e.cls) || enemies::defeated(animal))
             {
                 letting_go.push_back({animal, false});
                 continue;
