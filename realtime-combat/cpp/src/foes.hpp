@@ -316,8 +316,15 @@ namespace rtc::foes
         for (auto& [animal, e] : s.all) someone_attacking = someone_attacking || attacking(e.foe);
 
         std::vector<std::pair<UObject*, bool>> letting_go;   // (animal, back to roaming)
-        for (auto& [animal, e] : s.all)
+        // Over a copy of the fighters: a blow that lands here can fell your cat, and the fall ends every fight (clear)
+        // under this loop, so each is looked up again before it's touched (seen in game: a crash in a camp brawl).
+        std::vector<UObject*> fighting;
+        for (auto& [animal, e] : s.all) fighting.push_back(animal);
+        for (UObject* animal : fighting)
         {
+            auto found = s.all.find(animal);
+            if (found == s.all.end()) continue;   // let go while this loop ran
+            Entry& e = found->second;
             if (!game::staying(animal) || enemies::defeated(animal))
             {
                 letting_go.push_back({animal, false});
@@ -359,7 +366,8 @@ namespace rtc::foes
                 if (e.montage) game::set_montage_rate(animal, e.montage, spec.rate);
                 break;
             case FoeDo::Land:
-                if (land(animal))   // parried: it reels, open to a riposte
+                // parried: it reels, open to a riposte (unless its blow felled your cat, which ended the fight: `e` is gone)
+                if (land(animal) && s.all.contains(animal))
                 {
                     parried(e.foe, GuardSpec{}.parry_reel);
                     stop_animation(animal, e, 0.1);
@@ -385,6 +393,7 @@ namespace rtc::foes
                 break;
             case FoeDo::Nothing: break;
             }
+            if (!s.all.contains(animal)) continue;   // the fight ended in that step (your cat fell)
 
             // what each state does over time
             switch (e.foe.state)
