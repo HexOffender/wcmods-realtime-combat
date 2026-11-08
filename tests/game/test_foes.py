@@ -37,6 +37,9 @@ def setup(agent):
     if h.get(agent, "locked"):
         h.action(agent, "lock")
     IDS.clear()
+    # a fight needs level ground farther out than the rabbit's place: it paces, retreats and is pushed 3 to 7 m off,
+    # and down the slope by the den it's out of sight (the lock lets it go): face a way that's level out to 7 m first
+    h.scene(agent, {"near": (0, 300), "beyond": (0, 700)}, spawn=False)
     IDS.update(h.scene(agent, PLACES))
     agent.lua("Game.cat():heal() Game.cat():setStamina(100) return true")
     h.passive(agent, False)
