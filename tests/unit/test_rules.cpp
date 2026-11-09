@@ -305,6 +305,9 @@ static void moves_are_leaps()
     const rtc::DodgeSpec d;
     const rtc::Leap hop = rtc::hop_leap(d);
     CHECK(near(hop.speed, rtc::slide_speed(d), 0.1) && rtc::leap_height(hop) > 10 && rtc::leap_height(hop) < 25);
+    // a plain jump stays up longer, and still comes down before the dodge ends
+    CHECK(rtc::hop_air(d, true) > rtc::hop_air(d, false) && rtc::slide_start(d) + rtc::hop_air(d, true) < rtc::duration(d));
+    CHECK(rtc::leap_height(rtc::leap_for(d.distance, rtc::hop_air(d, true))) > 20);
     // an animal's pounce is in the air the time left to its blow, within bounds
     const rtc::FoeSpec s;
     CHECK(near(rtc::pounce_air(s, 0.5), 0.5) && near(rtc::pounce_air(s, 0.1), s.pounce_air_min) && near(rtc::pounce_air(s, 2), s.pounce_air_max));

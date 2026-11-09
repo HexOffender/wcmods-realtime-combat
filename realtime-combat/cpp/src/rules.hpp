@@ -430,14 +430,17 @@ namespace rtc
         double safe = 0.55;      // real seconds from the press in which nothing hurts your cat
         double stamina = 15;
         double least = 1;        // the least stamina it needs (any at all: see can_spend)
+        double jump_air = 0.45;  // a plain jump (no side hop: dodge_pose) is in the air this long: the game's own jump
+                                 // animation shows for it (the anim blueprint follows the movement), and needs the time
     };
     inline auto duration(const DodgeSpec& s) -> double { return (s.to - s.from) / s.rate; }
     // Real seconds from the press when the slide starts and ends.
     inline auto slide_start(const DodgeSpec& s) -> double { return std::max(0.0, s.slide_from - s.from) / s.rate; }
     inline auto slide_end(const DodgeSpec& s) -> double { return (s.slide_to - s.from) / s.rate; }
     inline auto slide_speed(const DodgeSpec& s) -> double { return s.distance / std::max(0.01, slide_end(s) - slide_start(s)); }
-    // The hop as a leap: its distance over the time it's in the air.
-    inline auto hop_leap(const DodgeSpec& s, double gravity = 980) -> Leap { return leap_for(s.distance, slide_end(s) - slide_start(s), gravity); }
+    // The hop as a leap: its distance over the time it's in the air (the side hop's window; a plain jump's jump_air).
+    inline auto hop_air(const DodgeSpec& s, bool jump) -> double { return jump ? s.jump_air : slide_end(s) - slide_start(s); }
+    inline auto hop_leap(const DodgeSpec& s, double gravity = 980) -> Leap { return leap_for(s.distance, hop_air(s, false), gravity); }
     inline auto safe_at(const DodgeSpec& s, double t) -> bool { return t >= 0 && t < s.safe; }
 
     // Which way it goes: the way the player's moving (forward and right from -1 to 1, as the camera sees them), or

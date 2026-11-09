@@ -33,6 +33,7 @@ namespace rtc::dodge
         UObject* montage{};
         bool was_safe = false;
         bool leapt = false;         // the hop's leap made
+        bool jump = false;          // a plain jump (no side hop): longer in the air, the game's jump animation showing
         int settle = 0;             // frames after the leap in which your cat isn't held still (the launch takes a tick)
         int made = 0, refused = 0, safe_starts = 0, kept_made = 0;
         double distance = 150;      // cm it leaps: settings.json's dodge_distance_m
@@ -112,6 +113,7 @@ namespace rtc::dodge
             if (auto at = game::at(me), them = game::at(t); at && them) target_yaw = yaw_to(*at, *them);
         const DodgePose pose = dodge_pose(s.way, target_yaw);
         if (std::abs(turn(pose.cat_yaw, *facing)) > 0.5) game::set_facing(me, pose.cat_yaw);
+        s.jump = pose.jump;
         s.montage = pose.jump ? nullptr
                               : game::play_from(me, pose.right ? L"Animation.Combat.Dodge.Right" : L"Animation.Combat.Dodge.Left", d.from, d.rate);
         s.on = true;
@@ -168,12 +170,12 @@ namespace rtc::dodge
         s.elapsed += dt;
         UObject* me = wcmods::player();
         // the hop's leap (rules.hpp, "leaps"): launched as the animation springs, down as it lands, `distance` the way
-        // it goes
+        // it goes; a plain jump a little longer in the air, for the game's jump animation
         if (!s.leapt && s.elapsed >= slide_start(d))
         {
             s.leapt = true;
             s.settle = 3;
-            game::leap(me, s.way, d.distance, slide_end(d) - slide_start(d));
+            game::leap(me, s.way, d.distance, hop_air(d, s.jump));
         }
         // on the ground (crouched before the hop, and come down), your cat stays put: held keys would creep it along
         if (s.settle > 0) --s.settle;

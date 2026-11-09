@@ -90,11 +90,11 @@ def test_locked_on_a_side_hop_faces_the_target(agent):
             agent.lua("Game.cat():setStamina(100) return true")
             before = h.get(agent, "dodges") or 0
             start = _at(agent)
+            to_rabbit = h.yaw_to(agent, "ahead")   # as the dodge begins (a hop to the side moves the rabbit's bearing)
             h.action(agent, word)
             h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
             playing = _montage(agent)
             facing = agent.lua("return Game.player():K2_GetActorRotation().Yaw")
-            to_rabbit = h.yaw_to(agent, "ahead")
             h.until(agent, f'not {h.MOD}.get("dodge")', 3, "the dodge to end")
             end = _at(agent)
             moved = math.hypot(end[0] - start[0], end[1] - start[1])
