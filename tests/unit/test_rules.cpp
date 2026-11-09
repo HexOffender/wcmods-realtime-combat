@@ -275,6 +275,38 @@ struct Rolls
     double operator()() { return i < next.size() ? next[i++] : 0.99; }
 };
 
+static void moves_are_leaps()
+{
+    // 150 cm in 0.36 s: 417 cm/s along, 176 cm/s up, 16 cm high
+    const rtc::Leap l = rtc::leap_for(150, 0.36);
+    CHECK(near(l.speed, 150 / 0.36, 0.1) && near(l.up, 980 * 0.18, 0.1) && near(rtc::leap_height(l), 15.9, 0.1));
+    CHECK(rtc::leap_for(-10, 0.3).speed == 0 && rtc::leap_for(100, 0).speed > 0);   // never backward; no time is a little time
+    CHECK(rtc::leap_height(rtc::leap_for(100, 0.3), 0) == 0);
+    // a strike leaps over its last 0.36 s at most, down as the blow lands; the lunge from its start
+    const auto& light = rtc::spec(rtc::Attack::Light);
+    const auto& heavy = rtc::spec(rtc::Attack::Heavy);
+    const auto& lunge = rtc::spec(rtc::Attack::Lunge);
+    CHECK(near(rtc::leap_at(light) + rtc::leap_air(light), rtc::hit_at(light)));
+    CHECK(near(rtc::leap_air(heavy), rtc::strike_air) && rtc::leap_at(heavy) > 0.3);
+    CHECK(near(rtc::leap_at(lunge), 0) && near(rtc::leap_air(lunge), rtc::hit_at(lunge)));
+    // how far: locked on, as far as brings the target in reach, up to the step; nothing locked, half a step; the lunge
+    // its whole way, and at least a little when its target's already near
+    CHECK(near(rtc::leap_distance(light, 100), 100) && near(rtc::leap_distance(light, 300), light.step) && near(rtc::leap_distance(light, -20), 0));
+    CHECK(near(rtc::leap_distance(light, std::nullopt), light.step * 0.5));
+    CHECK(near(rtc::leap_distance(lunge, std::nullopt), lunge.lunge) && near(rtc::leap_distance(lunge, -50), 40) && near(rtc::leap_distance(lunge, 500), lunge.lunge));
+    CHECK(lunge.lunge > 150 && lunge.lunge < 300 && lunge.step == 0 && light.lunge == 0);
+    // steered in the air: the speed that lands the gap in the time left, capped; none with nothing to go or no time
+    CHECK(near(rtc::steer_speed(100, 0.25), 400) && near(rtc::steer_speed(1000, 0.25), 600) && rtc::steer_speed(-5, 0.25) == 0 && rtc::steer_speed(100, 0.01) == 0);
+    // the dodge's hop: its distance over its time in the air, a hop's height
+    const rtc::DodgeSpec d;
+    const rtc::Leap hop = rtc::hop_leap(d);
+    CHECK(near(hop.speed, rtc::slide_speed(d), 0.1) && rtc::leap_height(hop) > 10 && rtc::leap_height(hop) < 25);
+    // an animal's pounce is in the air the time left to its blow, within bounds
+    const rtc::FoeSpec s;
+    CHECK(near(rtc::pounce_air(s, 0.5), 0.5) && near(rtc::pounce_air(s, 0.1), s.pounce_air_min) && near(rtc::pounce_air(s, 2), s.pounce_air_max));
+    CHECK(s.pounce_most > 0 && s.retreat_hop > 0 && s.hop_aside > 0 && s.retreat_air > 0 && s.hop_air > 0);
+}
+
 static void foes_hit_back()
 {
     const rtc::FoeSpec s;
@@ -583,6 +615,7 @@ int main()
     circling_keeps_to_the_circle();
     foes_hit_back();
     the_dodge();
+    moves_are_leaps();
     gate_is_on_only_for_a_sandbox_cat_in_the_world();
     gate_says_the_first_reason();
     every_state_has_words_and_a_code();

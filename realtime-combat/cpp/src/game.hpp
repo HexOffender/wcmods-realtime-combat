@@ -407,10 +407,10 @@ namespace rtc::game
 
     // Move a cat or an animal along the ground by `step` cm the way `yaw` points, as its own movement would: its body
     // swept along (K2_SetActorLocation with a sweep), so it stops against whatever's in the way, a wall, a rock or an
-    // animal, and its height kept over the ground. For moves the game's own movement won't make: while one of the
-    // game's fight animations plays on your cat, a LaunchCharacter does nothing (seen in game). Moved without the
-    // sweep (a teleport), your cat could end up inside an animal, and that starts the game's own fight even with the
-    // animals ignoring your cat (seen in game). False when it didn't move.
+    // animal, and its height kept over the ground. For moves off the navigation mesh (fleeing prey pushed into the
+    // bushes, a party cat whose walk gets it nowhere); the fights' own moves are leaps (leap(), below). Moved without
+    // the sweep (a teleport), your cat could end up inside an animal, and that starts the game's own fight even with
+    // the animals ignoring your cat (seen in game). False when it didn't move.
     inline auto slide(UObject* actor, double yaw_degrees, double step) -> bool
     {
         auto now = at(actor);
@@ -512,5 +512,138 @@ namespace rtc::game
         if (!a || !montage) return false;
         auto r = wcmods::call_reflected(a, STR("Montage_IsPlaying"), [&](wcmods::Params& p) { p.set_nth(0, wcmods::Value::of(montage)); });
         return r && r->get(L"ReturnValue").boolean();
+    }
+
+    // ------------------------------------------------------------------------------------------- leaps
+    // The engine's movement component of a cat or an animal (a Character), or nullptr.
+    inline auto movement(UObject* actor) -> UObject* { return actor ? wcmods::get(actor, L"CharacterMovement").object : nullptr; }
+    // Whether it's in the air (the movement's Falling mode, 3).
+    inline auto airborne(UObject* actor) -> bool
+    {
+        UObject* mv = movement(actor);
+        if (!mv) return false;
+        const wcmods::Value m = wcmods::get(mv, L"MovementMode");
+        return m.number() == 3 || m.string().find(L"Falling") != std::wstring::npos;
+    }
+    // Gravity on it (cm/s², positive): its movement's, else the engine's 980.
+    inline auto gravity(UObject* actor) -> double
+    {
+        auto r = wcmods::call_reflected(movement(actor), STR("GetGravityZ"));
+        const double g = r ? -r->get(L"ReturnValue").number() : 980;
+        return g > 1 ? g : 980;
+    }
+    // Stop it where it stands (its velocity gone), so held keys don't creep it along the ground, legs still, while one
+    // of the mod's animations plays. Not in the air: that would end a leap.
+    inline auto hold_still(UObject* actor) -> void
+    {
+        if (UObject* mv = movement(actor); mv && !airborne(actor)) wcmods::call_reflected(mv, STR("StopMovementImmediately"));
+    }
+    // Push it in the air: its speed along the ground made `speed` the way `yaw` points (an impulse of the difference,
+    // as a change of velocity), its fall kept. For a leap steered at a target that's moved.
+    inline auto steer(UObject* actor, double yaw_degrees, double speed) -> bool
+    {
+        UObject* mv = movement(actor);
+        auto v = wcmods::call_reflected(actor, STR("GetVelocity"));
+        if (!mv || !v) return false;
+        const wcmods::Value now = v->get(L"ReturnValue");
+        const double r = yaw_degrees / degrees_per_radian;
+        const double dx = std::cos(r) * speed - wcmods::get(now, L"X").number();
+        const double dy = std::sin(r) * speed - wcmods::get(now, L"Y").number();
+        return wcmods::call_reflected(mv, STR("AddImpulse"), [&](wcmods::Params& p) {
+                   wcmods::Value i = p.nth(0);
+                   wcmods::set(i, L"X", dx);
+                   wcmods::set(i, L"Y", dy);
+                   wcmods::set(i, L"Z", 0.0);
+                   p.set_nth(1, wcmods::Value::of(true));   // bVelocityChange
+               }).has_value();
+    }
+
+    // The anim instance's root motion mode (ERootMotionMode: 0 none extracted, 1 ignored, 2 from everything, 3 from
+    // montages only, which the cats and animals have). With it taken from montages, while a montage marked for root
+    // motion plays the engine moves the actor by the montage's root bone and takes no other velocity: a launch does
+    // nothing (seen in game), and as the fight animations' root bones stay put (measured), nothing moves at all. So
+    // while one of the mod's moves plays, root motion is ignored and the movement takes the leap (free_moves, and
+    // foes.hpp for the animals).
+    inline auto root_motion_mode(UObject* actor) -> std::optional<int>
+    {
+        UObject* a = anim(actor);
+        if (!a) return std::nullopt;
+        const wcmods::Value m = wcmods::get(a, L"RootMotionMode");   // an enum: its number
+        if (!m) return std::nullopt;
+        return static_cast<int>(m.number());
+    }
+    inline auto set_root_motion_mode(UObject* actor, int mode) -> bool
+    {
+        UObject* a = anim(actor);
+        return a && wcmods::call_reflected(a, STR("SetRootMotionMode"), [&](wcmods::Params& p) { p.set_nth(0, wcmods::Value::of(mode)); }).has_value();
+    }
+
+    // Free movement for your cat while one of the mod's moves (an attack, a dodge) plays: root motion ignored (above),
+    // and the movement's own turning off (with root motion out of the way it would turn your cat toward held keys at
+    // 520 degrees a second, where the game turns it itself). What your cat had is put back with `on` false, or when
+    // another actor is your cat.
+    struct Free
+    {
+        UObject* actor{};
+        UClass* cls{};
+        int root_mode_was = 3;
+        bool orient_was = true;
+    };
+    inline auto free_state() -> Free&
+    {
+        static Free f;
+        return f;
+    }
+    inline auto free_moves(UObject* actor, bool on) -> void
+    {
+        Free& f = free_state();
+        if (f.actor && (!on || actor != f.actor))
+        {
+            if (staying(f.actor, f.cls))
+            {
+                set_root_motion_mode(f.actor, f.root_mode_was);
+                if (UObject* mv = movement(f.actor)) wcmods::set(mv, L"bOrientRotationToMovement", f.orient_was);
+            }
+            f = {};
+        }
+        if (on && actor && !f.actor)
+        {
+            f.actor = actor;
+            f.cls = actor->GetClassPrivate();
+            f.root_mode_was = root_motion_mode(actor).value_or(3);
+            UObject* mv = movement(actor);
+            f.orient_was = mv ? wcmods::get(mv, L"bOrientRotationToMovement").boolean(true) : true;
+            set_root_motion_mode(actor, 1);
+            if (mv) wcmods::set(mv, L"bOrientRotationToMovement", false);
+        }
+    }
+
+    // A leap: `distance` cm the way `yaw` points, in the air `air` seconds (down as a blow lands, say), through the
+    // engine's own movement (LaunchCharacter: forward and up, gravity bringing it down; it meets what's in the way,
+    // comes down on the ground wherever that is, and the camera follows). Not over a drop: where the ground halfway or
+    // where it would come down is more than `drop` cm below the ground here (a ledge, a bank: the ground traced from
+    // 80 cm up), a shorter leap is tried, down to a hop in place. A rise there (a rock, a log, a bush the trace lands
+    // on) doesn't stop it: the movement meets a real one itself, and the fights' animals pace among rocks and bushes
+    // (a check against rises refused most short leaps at them, seen in scripted fights). How far it was sent (0 for
+    // none, or a hop in place).
+    constexpr double leap_drop = 120;
+    inline auto leap(UObject* actor, double yaw_degrees, double distance, double air) -> double
+    {
+        auto now = at(actor);
+        if (!now) return 0;
+        const double r = yaw_degrees / degrees_per_radian, dx = std::cos(r), dy = std::sin(r);
+        double d = std::max(0.0, distance);
+        if (auto here = wcmods::ground(now->x, now->y, now->z + 50))
+            while (d >= 5)
+            {
+                auto there = wcmods::ground(now->x + dx * d, now->y + dy * d, now->z + 80);
+                auto half = wcmods::ground(now->x + dx * d / 2, now->y + dy * d / 2, now->z + 80);
+                if (there && half && *there >= *here - leap_drop && *half >= *here - leap_drop) break;
+                d *= 0.6;
+            }
+        if (d < 5) d = 0;
+        const Leap l = leap_for(d, air, gravity(actor));
+        if (!launch(actor, {dx * l.speed, dy * l.speed, l.up})) return 0;
+        return d;
     }
 } // namespace rtc::game

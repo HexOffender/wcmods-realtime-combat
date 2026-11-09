@@ -104,6 +104,7 @@ namespace
                 rtc::lockon::release("off");
                 rtc::attacks::end();
                 rtc::dodge::end();
+                rtc::game::free_moves(nullptr, false);   // your cat's movement as the game has it
                 rtc::flask::end();
                 rtc::blocking::clear();
                 rtc::hurt::clear();
@@ -160,6 +161,8 @@ namespace
             for (auto a : {rtc::input::Action::Light, rtc::input::Action::Heavy, rtc::input::Action::Lunge})
                 pressed.on[static_cast<size_t>(a)] = false;
         rtc::attacks::frame(dt, pressed);
+        // while an attack or a dodge plays, the movement takes its leap (root motion out of the way: game.hpp, "leaps")
+        rtc::game::free_moves(wcmods::player(), rtc::attacks::busy() || rtc::dodge::busy());
         rtc::flask::frame(dt, pressed, !rtc::attacks::busy() && !rtc::dodge::busy());
         rtc::blocking::frame(dt, rtc::input::held(Action::Block),
                           !rtc::attacks::busy() && !rtc::dodge::busy() && !rtc::flask::busy() && !rtc::hurt::reeling());

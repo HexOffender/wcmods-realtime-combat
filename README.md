@@ -29,19 +29,24 @@ notice your cat, it pounces on one, or walks into one. Instead:
   it, and none comes back while you act or for a moment after. An attack needs at least half its cost; a
   dodge needs only a scrap, so a cat can always leap aside, though a dodge from an empty bar leaves nothing
   for an attack after it.
-- **Dodging:** your cat can't be hurt for the first 0.55 s of a dodge. A dodge takes it 1.5 m, a cat's hop
+- **Dodging:** your cat can't be hurt for the first 0.55 s of a dodge. A dodge leaps it 1.5 m, a cat's hop
   (`dodge_distance_m` in the settings, 0.5 to 5). Pressed during your own attack's wind-up, the dodge waits and
   goes the moment your blow lands, so a dodge pressed at the mark is never lost to an attack already begun.
 - **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
   to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
-  in front. A light attack pressed as one lands follows it. Locked on, a strike keeps facing its target and steps
-  in toward it as it comes down, up to 1.2 m (a heavy one 0.9 m), so an animal pacing just out of reach is hit.
+  in front. A light attack pressed as one lands follows it. Locked on, a strike keeps facing its target and leaps
+  in at it as it comes down, up to 1.2 m (a heavy one 0.9 m), steered at it in the air, so an animal pacing just
+  out of reach is hit; the lunge leaps about 2 m.
+- **Every move is a leap**, your cat's and the animals': through the game's own movement, up and down again as
+  the animation lands, so a cat's body rises and falls as it closes, hops or pounces, it comes down on the ground
+  wherever that is, it stops against what it meets, and the camera follows. Nothing slides along the ground.
 - **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
-  cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
-  in with a wind-up you can see coming, a yellow **!** over it from the start (don't begin an attack now),
-  following your cat until the last moment, when it's committed: the **!** turns red then, and says dodge or
-  block now (a dodge then is safe right through the blow). After striking it's open for a moment before it
-  backs off again. Hit one in its wind-up and it reels.
+  cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one winds
+  up where it stands, a yellow **!** over it from the start (don't begin an attack now), turning to keep your
+  cat in front until the last moment, when it's committed: the **!** turns red then and it pounces straight at
+  where your cat is, so dodge or block now (a dodge then is safe right through the blow, and a hop aside or back
+  takes you out of its path). After striking it's open for a moment before it hops back again. Hit one in its
+  wind-up and it reels.
   - **Some guard** when you attack them from in front (a badger most, a fox often): a guarded hit does a fifth
     of its damage and fills the animal's **posture** (the gold bar under its health; a heavy attack fills it
     twice as fast). Full, its guard breaks and it reels, open to a riposte. Keep swinging at a guard and it
