@@ -1,13 +1,15 @@
 // attacks.hpp: step 3, your cat's attacks. F is a light attack (the fights' Quick Claw), G a heavy one (Strong Claw),
-// F while running a lunge (Jump Attack) that carries your cat forward. Each plays the strike of its animation
-// (rules.hpp's spec()), costs the game's own stamina, turns your cat to the animal it's locked on to, and at the
-// moment it lands hits one animal in front that your cat can see: the one it's locked on to, else the nearest
-// (enemies.hpp). The heavy attack is a wide swing and hits every animal in the cone. A light attack pressed once one
-// has landed follows it.
+// F while running a lunge (Jump Attack) that leaps your cat forward. Each plays the strike of its animation
+// (rules.hpp's spec()), costs the game's own stamina, turns your cat to the animal it's locked on to, leaps in toward
+// it (rules.hpp, "leaps": a strike over its last 0.36 s, down as the blow lands, as far as brings the target in reach;
+// the lunge from its start, its whole way) and at the moment it lands hits one animal in front that your cat can see:
+// the one it's locked on to, else the nearest (enemies.hpp). The heavy attack is a wide swing and hits every animal in
+// the cone. A light attack pressed once one has landed follows it.
 //
 // Shared for tests: "attack" (the one playing: "light", "heavy", "lunge", or ""), "attacks" (how many made),
 // "hits" (how many animals hit), "last_hit" (the last one's address), "refused" (attacks not made for want of
-// stamina).
+// stamina), "step_moved" (cm the last one's leap carried your cat), "step_blocked" (1 when its leap was refused: a
+// drop or a step too high where it would have come down).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -34,8 +36,10 @@ namespace rtc::attacks
         UObject* montage{};
         double elapsed = 0;
         bool landed = false;
-        double stepped = 0;           // cm this strike has stepped in (AttackSpec::step)
-        int step_blocked = 0;         // frames its step-in slide was refused (for tests: shared as the strike ends)
+        bool leapt = false;           // its leap made (or refused)
+        int settle = 0;               // frames after the leap in which your cat isn't held still (the launch takes a tick)
+        std::optional<Vec> from;      // where your cat was as it leapt
+        int step_blocked = 0;         // 1 when the leap was refused (for tests: shared as the strike ends)
         std::optional<Attack> next;   // pressed during the last part of this one
         int made = 0, hits = 0, refused = 0;
         double damage_multiplier = 1;
@@ -77,13 +81,16 @@ namespace rtc::attacks
             wcmods::share("refused", ++s.refused);
             return false;
         }
+        game::free_moves(me, true);   // the movement takes the leap (root motion out of the way)
         if (UObject* target = lockon::locked()) game::turn_to(me, target);
         s.montage = game::play_from(me, sp.tag, sp.from, sp.rate);
         if (s.on_start) s.on_start(a);
         s.now = a;
         s.elapsed = 0;
         s.landed = false;
-        s.stepped = 0;
+        s.leapt = false;
+        s.settle = 0;
+        s.from.reset();
         s.step_blocked = 0;
         s.next.reset();
         wcmods::share("attack", sp.name);
@@ -95,11 +102,13 @@ namespace rtc::attacks
     {
         State& s = state();
         if (!s.now) return;
-        if (s.montage && game::montage_on(wcmods::player(), s.montage)) game::stop_montage(wcmods::player(), s.montage, 0.25);
+        UObject* me = wcmods::player();
+        if (s.montage && game::montage_on(me, s.montage)) game::stop_montage(me, s.montage, 0.25);
+        auto now = game::at(me);
         s.now.reset();
         s.montage = nullptr;
         wcmods::share("attack", "");
-        wcmods::share("step_moved", s.stepped);
+        wcmods::share("step_moved", s.from && now ? flat_distance(*s.from, *now) : 0.0);
         wcmods::share("step_blocked", s.step_blocked);
     }
 
@@ -172,29 +181,36 @@ namespace rtc::attacks
         // until it lands, a strike keeps facing what it's locked on to (an animal pacing round your cat walked out of
         // the cone during the wind-up, and the blow missed)
         if (target && !s.landed) game::turn_to(me, target);
-        // a lunge carries your cat forward from a little before it lands to a little after (slid along the ground: the
-        // game's movement doesn't move it while the animation plays)
-        if (sp.lunge > 0 && s.elapsed >= hit_at(sp) - 0.25 && s.elapsed - dt < hit_at(sp) + 0.05)
-            if (auto yaw = game::facing(me)) game::slide(me, *yaw, sp.lunge * dt);
-        // a strike steps in over the last 0.3 s of its wind-up: toward what it's locked on to, as far as it needs (up
-        // to `step`) to bring it in reach (the animals pace just out of reach, and most blows fell short), or a short
-        // step forward with nothing locked
-        if (sp.step > 0 && !s.landed && s.elapsed >= hit_at(sp) - 0.3)
+        // the leap (rules.hpp, "leaps"): a strike a little before its blow, a lunge from its start; toward what it's
+        // locked on to, as far as brings it in reach (the animals pace just out of reach, and most blows fell short), or
+        // a short way forward with nothing locked (a lunge its whole way)
+        if (!s.leapt && s.elapsed >= leap_at(sp))
         {
-            double gap = sp.step * 0.5 - s.stepped;
+            s.leapt = true;
+            s.settle = 3;
+            s.from = game::at(me);
+            std::optional<double> gap;
+            std::optional<double> yaw = game::facing(me);
             if (target)
-            {
-                auto at = game::at(me), them = game::at(target);
-                gap = at && them ? flat_distance(*at, *them) - (sp.reach - 40) : 0;
-            }
-            const double move = std::min({gap, sp.step - s.stepped, 500 * dt});
-            if (move > 0)
-            {
-                auto yaw = game::facing(me);
-                if (yaw && game::slide(me, *yaw, move)) s.stepped += move;
-                else ++s.step_blocked;
-            }
+                if (auto them = game::at(target); s.from && them)
+                {
+                    gap = flat_distance(*s.from, *them) - (sp.reach - 40);
+                    yaw = yaw_to(*s.from, *them);
+                }
+            const double want = leap_distance(sp, gap);
+            if (want > 0 && yaw && game::leap(me, *yaw, want, leap_air(sp)) <= 0) s.step_blocked = 1;
         }
+        // in the air, locked on: steered at the target, which may have moved meanwhile, to come down in reach
+        if (s.leapt && !s.landed && target && game::airborne(me))
+            if (auto at = game::at(me), them = game::at(target); at && them)
+            {
+                const double left = hit_at(sp) - s.elapsed;
+                if (left >= 0.05) game::steer(me, yaw_to(*at, *them), steer_speed(flat_distance(*at, *them) - (sp.reach - 40), left));
+            }
+        // on the ground (before the leap, and come down), your cat stays put: held keys would creep it along, legs
+        // still (the animation has the whole body)
+        if (s.settle > 0) --s.settle;
+        else game::hold_still(me);
         if (!s.landed && s.elapsed >= hit_at(sp))
         {
             s.landed = true;

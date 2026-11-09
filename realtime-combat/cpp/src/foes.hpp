@@ -57,6 +57,8 @@ namespace rtc::foes
         double fled_dist = 0;   // fleeing: how far from your cat it was when last asked to run (no farther: its way's blocked)
         double flee_turn = 0;   // and the way it's turned off from straight away, degrees (a side, then the other)
         bool flee_slides = false;   // its walk got it nowhere: slid along the ground this second instead
+        bool leapt = false;         // this wind-up's pounce made
+        int root_mode_was = 3;      // its anim instance's root motion mode as it joined (put back as it's let go)
     };
     struct State
     {
@@ -151,6 +153,10 @@ namespace rtc::foes
         e.profile = profile(enemies::of(animal).model);
         e.foe.cooldown = 0.8 + 1.2 * roll();   // a moment's look at your cat before the first attack
         if (auto where = game::at(animal)) e.home = *where;
+        // its moves in the fight are leaps through its movement (game::leap): root motion out of their way meanwhile
+        // (a cat's Quick Claw is marked for root motion, which locks its movement while it plays: game.hpp, "leaps")
+        e.root_mode_was = game::root_motion_mode(animal).value_or(3);
+        game::set_root_motion_mode(animal, 1);
         wcmods::follow(animal, wcmods::player(), {.distance = e.profile.spacing, .speed = e.profile.speed});
         s.all[animal] = e;
         share_state(animal, e.foe);
@@ -167,6 +173,7 @@ namespace rtc::foes
         if (game::staying(animal, it->second.cls))
         {
             stop_animation(animal, it->second, 0.2);
+            game::set_root_motion_mode(animal, it->second.root_mode_was);
             wcmods::stop_following(animal, false);
             wcmods::stop_moving(animal);
             if (roam && game::clan_cat(animal)) enemies::forget(animal);   // (Clan life walks its cats: no game tree to start)
@@ -218,7 +225,8 @@ namespace rtc::foes
         wcmods::share("guards", ++state().guards);
     }
 
-    // A hop aside, out of your cat's reach: the game's dodge to that side, and slid there (the dodge doesn't move it).
+    // A hop aside, out of your cat's reach: the game's dodge to that side, and a leap that way (the animation doesn't
+    // move it: rules.hpp, "leaps").
     inline auto hop(UObject* animal, Entry& e) -> void
     {
         stop_animation(animal, e, 0.1);
@@ -226,6 +234,9 @@ namespace rtc::foes
         wcmods::stop_moving(animal);
         e.foe.side = roll() < 0.5 ? 1 : -1;
         wcmods::play_montage(animal, e.foe.side > 0 ? L"Animation.Combat.Dodge.Left" : L"Animation.Combat.Dodge.Right");
+        const FoeSpec& spec = spec_for(animal);
+        auto me = game::at(wcmods::player()), them = game::at(animal);
+        if (me && them) game::leap(animal, yaw_to(*me, *them) + e.foe.side * 90, spec.hop_aside, spec.hop_air);
         wcmods::share("hops", ++state().hops);
     }
 
@@ -259,6 +270,7 @@ namespace rtc::foes
         const FoeSpec& spec = spec_for(animal);
         wcmods::face(animal, wcmods::player());
         e.montage = game::play_from(animal, spec.tag, std::max(spec.from, spec.hit - spec.quick * spec.rate), spec.rate);
+        e.leapt = false;   // (a quick strike is committed from its start: it pounces at once, if your cat's out of range)
     }
 
     // Your cat's hit landing on it (attacks.hpp): the part of the hit's damage it takes (0: none), its guard, hop and
@@ -379,6 +391,7 @@ namespace rtc::foes
                 wcmods::stop_moving(animal);
                 wcmods::face(animal, me);
                 e.montage = game::play_from(animal, spec.tag, spec.from, spec.rate);
+                e.leapt = false;
                 someone_attacking = true;
                 wcmods::share("foe_attacks", ++s.attacks);
                 if (e.foe.hold > 0) wcmods::share("feints", ++s.feints);
@@ -404,6 +417,8 @@ namespace rtc::foes
                 break;
             case FoeDo::Retreat:
                 stop_animation(animal, e, 0.25);
+                // a hop back toward its spacing (rules.hpp, "leaps"), facing your cat
+                if (dist < e.profile.spacing) game::leap(animal, yaw_to(*at_me, *them), std::min(e.profile.spacing - dist, spec.retreat_hop), spec.retreat_air);
                 break;
             case FoeDo::Flee:
                 stop_animation(animal, e, 0.2);
@@ -435,29 +450,27 @@ namespace rtc::foes
                 break;
             case FoeState::WindUp:
             {
-                // early on it turns to your cat and rushes in to striking range, following it; the last moment it's
-                // committed (dodge then): it neither turns to your cat nor follows it, its rush going straight on (a
-                // dodge aside or back takes your cat out of the blow). Held in a feint, it keeps watching.
+                // early on it turns to your cat, watching; the last moment it's committed (dodge then): it turns no
+                // more, and pounces straight in to striking range (rules.hpp, "leaps": one leap, down as its blow
+                // lands), so a dodge aside or back takes your cat out of the blow. Held in a feint, it keeps watching,
+                // and pounces on the release.
                 const double committed = e.foe.quick ? e.foe.strike_at - spec.commit : commit_at(spec);
                 const bool watching = e.foe.t < committed || (e.foe.held && e.foe.t < e.foe.hold_at + e.foe.hold);
                 if (watching) wcmods::face(animal, me);
-                if (dist > e.profile.attack_range && !e.foe.landed)
+                else if (!e.leapt && !e.foe.landed)
                 {
-                    const double left = std::max(0.15, e.foe.strike_at - e.foe.t - 0.05);
+                    e.leapt = true;
+                    wcmods::face(animal, me);
                     const double gap = dist - e.profile.attack_range;
-                    if (watching) game::slide(animal, yaw_to(*them, *at_me), std::min({gap / left * dt, 700 * dt, gap}));
-                    else if (auto facing = game::facing(animal)) game::slide(animal, *facing, std::min(gap, 500 * dt));
+                    if (gap > 0) game::leap(animal, yaw_to(*them, *at_me), std::min(gap, spec.pounce_most), pounce_air(spec, e.foe.strike_at - e.foe.t));
                 }
                 break;
             }
             case FoeState::Retreat:
-                // backs off, still facing your cat, to its spacing
-                if (dist < e.profile.spacing) game::slide(animal, yaw_to(*at_me, *them), std::min(e.profile.spacing - dist, 320 * dt));
+                // backing off (it hopped back as the retreat began), still facing your cat
                 wcmods::face(animal, me);
                 break;
-            case FoeState::Hop:
-                if (e.foe.t < spec.hop) game::slide(animal, yaw_to(*at_me, *them) + e.foe.side * 90, 330 * dt);
-                break;
+            case FoeState::Hop: break;   // (it leapt aside as the hop began: hop())
             case FoeState::Guard: wcmods::face(animal, me); break;
             case FoeState::Flee:
                 e.reflee -= dt;

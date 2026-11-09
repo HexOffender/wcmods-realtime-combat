@@ -132,6 +132,11 @@ buttons and shoulders are taken).
   1.5 s, walks back), so an attack plays only its strike, from about 1.0 s to 2.0 s, a little faster.
   While one plays, the game's movement takes no push (`LaunchCharacter` does nothing), so the lunge
   slides your cat along the ground itself (a line for walls, its height kept over the ground).
+  **Later (2026-11-09):** the push did nothing because the animation's marked for root motion (the anim
+  instance takes root motion from montages, and these montages' root bones stay put: measured), so the mod
+  ignores root motion while its own moves play and the movement takes a launch: strikes, the lunge, the dodge
+  and the animals' rush, retreat and hop aside are leaps now, up and down again, not slides (the README, and
+  `rules.hpp`, "leaps"). The player had said the moves glided across the ground.
 - A hit is the animal in a cone in front of your cat within reach at the moment the attack lands. The
   damage comes from your cat's level and stats, and the animal plays a hit reaction and is pushed back.
 - An animal's health: a base for its kind (by its mesh, `SK_Rabbit`...) grown 12% a level, times a

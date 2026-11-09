@@ -269,16 +269,17 @@ namespace rtc
         double stamina;             // what it costs
         double damage;              // times the light attack's damage
         double push;                // how hard it pushes what it hits away (cm/s)
-        double lunge;               // how fast it carries your cat forward as it strikes, for 0.3 s (cm/s, 0 for none)
-        double step;                // how far it steps in toward what it's locked on to, at most, to bring it in reach (cm;
-                                    // half that forward with nothing locked; 0 for none)
+        double lunge;               // a lunge: how far it leaps forward with nothing locked on to (cm; 0 for a strike);
+                                    // locked on, as far as brings its target in reach, up to this
+        double step;                // a strike: how far it leaps in toward what it's locked on to, at most, to bring it in
+                                    // reach (cm; half that forward with nothing locked; 0 for none)
         bool wide;                  // a wide swing: lands on every animal in the cone; else on one (the target, or the nearest)
     };
     inline auto spec(Attack a) -> const AttackSpec&
     {
         static const AttackSpec light{"light", L"Gameplay.Combat.Attack.Universal.2", 1.0, 1.95, 1.5, 1.3, 190, 60, 12, 1.0, 150, 0, 120, false};
         static const AttackSpec heavy{"heavy", L"Gameplay.Combat.Attack.Universal.3", 0.85, 2.1, 1.6, 1.0, 210, 70, 25, 1.9, 350, 0, 90, true};
-        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 700, 0, false};
+        static const AttackSpec lunge{"lunge", L"Gameplay.Combat.Attack.Universal.14", 1.0, 2.05, 1.55, 1.1, 230, 55, 20, 1.5, 250, 210, 0, false};
         switch (a)
         {
         case Attack::Light: return light;
@@ -292,6 +293,46 @@ namespace rtc
     inline auto duration(const AttackSpec& s) -> double { return (s.to - s.from) / s.rate; }
     inline auto hit_at(const AttackSpec& s) -> double { return (s.hit - s.from) / s.rate; }
     inline auto chain_from(const AttackSpec& s) -> double { return hit_at(s); }
+
+    // ------------------------------------------------------------------------------------------- leaps
+    // What moves your cat (and the animals) in a fight is a leap through the engine's own movement, not a slide along
+    // the ground: a launch forward and up, gravity bringing it down, so the body rises and falls as a cat's does, the
+    // camera follows, and it stops against whatever it meets. (The game's fight animations don't move their root bone,
+    // so an animation can't carry a cat: measured. A strike, a lunge or a hop slid flat along the ground read as
+    // gliding, the player said.) To go `distance` cm in `air` seconds: these speeds (cm/s), with gravity g (cm/s²).
+    struct Leap
+    {
+        double speed = 0;   // along the ground
+        double up = 0;      // upward, at the start
+    };
+    inline auto leap_for(double distance, double air, double gravity = 980) -> Leap
+    {
+        air = std::max(air, 0.05);
+        return {std::max(0.0, distance) / air, std::max(0.0, gravity) * air / 2};
+    }
+    // How high it goes (cm).
+    inline auto leap_height(const Leap& l, double gravity = 980) -> double { return gravity > 0 ? l.up * l.up / (2 * gravity) : 0; }
+    // A strike leaps in over its last `strike_air` seconds (as long as the wind-up allows), coming down as the blow does;
+    // a lunge leaps from its start, down as it lands.
+    constexpr double strike_air = 0.36;
+    inline auto leap_air(const AttackSpec& s) -> double { return s.lunge > 0 ? hit_at(s) : std::min(hit_at(s), strike_air); }
+    inline auto leap_at(const AttackSpec& s) -> double { return std::max(0.0, hit_at(s) - leap_air(s)); }
+    // How far an attack leaps: locked on, as far as brings its target in reach (`gap`: the target's distance less the
+    // reach, with a margin), up to its `step` (a lunge up to its `lunge`, and a lunge is always a leap); nothing locked,
+    // half a step forward, a lunge its whole way.
+    inline auto leap_distance(const AttackSpec& s, std::optional<double> gap) -> double
+    {
+        const double most = s.lunge > 0 ? s.lunge : s.step;
+        if (!gap) return s.lunge > 0 ? s.lunge : s.step * 0.5;
+        return std::clamp(*gap, s.lunge > 0 ? 40.0 : 0.0, most);
+    }
+    // A leap steered in the air at a target that's moved: the speed along the ground that still lands `gap` cm on in
+    // the time left (no faster than `most`; none with no time left).
+    inline auto steer_speed(double gap, double left, double most = 600) -> double
+    {
+        if (left < 0.05 || gap <= 0) return 0;
+        return std::min(most, gap / left);
+    }
 
     // Stamina, as the game keeps it (100 on a cat, 20 a second back): an attack needs at least half its cost, and takes
     // it to 0 at worst; none comes back while it plays or for `stamina_pause` seconds after.
@@ -377,14 +418,15 @@ namespace rtc
 
     // ------------------------------------------------------------------------------------------- the dodge
     // The game has a hop to each side (Animation.Combat.Dodge.Left/Right, 2 s each): crouched to about 0.3 s, the hop
-    // from about 0.4 s to 0.8 s, landed by 1.0 s (seen in game). A dodge plays from `from` to `to` at `rate`, slides your
-    // cat `distance` cm while the hop's in the air (slide_from to slide_to, montage seconds), and nothing hurts it for
+    // from about 0.4 s to 0.8 s, landed by 1.0 s (seen in game; the animation itself only crouches and springs, it
+    // doesn't move or rise). A dodge plays from `from` to `to` at `rate`, leaps your cat `distance` cm over the hop
+    // (slide_from to slide_to, montage seconds: launched at the first, down at the second), and nothing hurts it for
     // its first `safe` real seconds.
     struct DodgeSpec
     {
         double from = 0.25, to = 1.15, rate = 1.4;
         double slide_from = 0.35, slide_to = 0.85;
-        double distance = 150;   // cm it slides (dodge.hpp takes it from settings.json's dodge_distance_m)
+        double distance = 150;   // cm it leaps (dodge.hpp takes it from settings.json's dodge_distance_m)
         double safe = 0.55;      // real seconds from the press in which nothing hurts your cat
         double stamina = 15;
         double least = 1;        // the least stamina it needs (any at all: see can_spend)
@@ -394,6 +436,8 @@ namespace rtc
     inline auto slide_start(const DodgeSpec& s) -> double { return std::max(0.0, s.slide_from - s.from) / s.rate; }
     inline auto slide_end(const DodgeSpec& s) -> double { return (s.slide_to - s.from) / s.rate; }
     inline auto slide_speed(const DodgeSpec& s) -> double { return s.distance / std::max(0.01, slide_end(s) - slide_start(s)); }
+    // The hop as a leap: its distance over the time it's in the air.
+    inline auto hop_leap(const DodgeSpec& s, double gravity = 980) -> Leap { return leap_for(s.distance, slide_end(s) - slide_start(s), gravity); }
     inline auto safe_at(const DodgeSpec& s, double t) -> bool { return t >= 0 && t < s.safe; }
 
     // Which way it goes: the way the player's moving (forward and right from -1 to 1, as the camera sees them), or
@@ -453,8 +497,16 @@ namespace rtc
         double broken_for = 2.0;       // its guard broken: it reels this long, open to a riposte
         double pace_turn = 2.5;        // pacing: after this long it may turn and pace the other way
         double flee_escape = 1800;     // fleeing prey this far from your cat has got away
+        // its moves are leaps (rules.hpp, "leaps"): the pounce as it commits, to attack_range (at most this far, in the
+        // time left to its blow, within these bounds); the hop back as it retreats; the hop aside out of reach
+        double pounce_most = 350;
+        double pounce_air_min = 0.2, pounce_air_max = 0.5;
+        double retreat_hop = 180, retreat_air = 0.4;
+        double hop_aside = 180, hop_air = 0.45;
     };
     inline auto duration(const FoeSpec& s) -> double { return (s.to - s.from) / s.rate; }
+    // How long its pounce is in the air: the time left to its blow, within the spec's bounds.
+    inline auto pounce_air(const FoeSpec& s, double left) -> double { return std::clamp(left, s.pounce_air_min, s.pounce_air_max); }
     // A cat's attack: the cats' quick claw (your cat's light attack, its timing measured the same), not an animal's
     // default fight animation.
     inline auto cat_foe_spec() -> const FoeSpec&
@@ -626,7 +678,7 @@ namespace rtc
     // An animal fighting your cat, as a state that moves on with time:
     //   Approach: it comes toward your cat, to its spacing;
     //   Pace:     it paces round your cat at its spacing, watching, until it's its turn and its cooldown's done;
-    //   WindUp:   it rushes in and attacks, landing at `strike_at` (held a while first if it's a feint);
+    //   WindUp:   it winds up, pounces in as it commits and attacks, landing at `strike_at` (held a while first if it's a feint);
     //   Recover:  it struck; it's open for a moment (or strikes again: a combo);
     //   Retreat:  it backs off to its spacing;
     //   Guard:    it guards against your cat's attack (from in front: chip damage, and its posture fills);
@@ -685,7 +737,7 @@ namespace rtc
         Nothing,
         Approach,      // go toward your cat, to its spacing (follow at that distance)
         Pace,          // pace round your cat on its `side` (again when it turns)
-        StartAttack,   // stop moving, face your cat, rush in to attack_range and play the attack from the start
+        StartAttack,   // stop moving, face your cat and play the attack from the start (as it commits, it pounces in to attack_range)
         Hold,          // the feint: freeze the attack's animation where it is
         Release,       // and play it on
         Land,          // the hit: your cat in reach and in front, and not dodging, takes it
