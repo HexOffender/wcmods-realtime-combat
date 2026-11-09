@@ -296,6 +296,10 @@ namespace rtc
     // Stamina, as the game keeps it (100 on a cat, 20 a second back): an attack needs at least half its cost, and takes
     // it to 0 at worst; none comes back while it plays or for `stamina_pause` seconds after.
     inline auto can_spend(double stamina, double cost) -> bool { return stamina >= cost * 0.5; }
+    // With `least` the least stamina the action needs (a dodge needs only a scrap: a cat can always leap aside, though a
+    // dodge from an empty bar leaves nothing for an attack after; in scripted fights, every dodge lost to stamina was
+    // a hit taken).
+    inline auto can_spend(double stamina, double cost, double least) -> bool { return stamina >= std::min(least, cost * 0.5); }
     inline auto spend(double stamina, double cost) -> double { return std::max(0.0, stamina - cost); }
     constexpr double stamina_pause = 0.6;
 
@@ -383,6 +387,7 @@ namespace rtc
         double distance = 150;   // cm it slides (dodge.hpp takes it from settings.json's dodge_distance_m)
         double safe = 0.55;      // real seconds from the press in which nothing hurts your cat
         double stamina = 15;
+        double least = 1;        // the least stamina it needs (any at all: see can_spend)
     };
     inline auto duration(const DodgeSpec& s) -> double { return (s.to - s.from) / s.rate; }
     // Real seconds from the press when the slide starts and ends.
@@ -433,8 +438,9 @@ namespace rtc
         double leash = 2000;           // or than this from where it joined the fight,
         double give_up_after = 3;      // for this long: it goes back to roaming
         double stagger = 0.5;          // a hit in its wind-up stops the attack; it reels this long
-        double commit = 0.4;           // the last part of a wind-up: it no longer turns to or follows your cat, and the
-                                       // HUD's mark shows over it (when to dodge: the dodge's safe moment covers it)
+        double commit = 0.5;           // the last part of a wind-up: it no longer turns to or follows your cat, and the
+                                       // HUD's mark turns red over it (when to dodge: a quarter second to see it and
+                                       // press, and the dodge's safe moment covers the blow)
         double quick = 0.45;           // a combo's second strike, or a counter, lands this long after it starts
         double combo_gap = 0.15;       // between a strike and a combo's second
         double punish = 0.7;           // after striking it stays open this long, then backs off

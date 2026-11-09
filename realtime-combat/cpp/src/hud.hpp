@@ -7,7 +7,9 @@
 // Sizes are the game's UI units (laid out for 3840 by 2160). Everything's made once and moved each frame; the HUD's
 // looked for again twice a second (the game makes a new one after a fight or a new area).
 //
-// Shared for tests: "bars" (how many animal bars show), "target_bar" (true while the target's big bar shows).
+// Shared for tests: "bars" (how many animal bars show), "target_bar" (true while the target's big bar shows), "mark" (the
+// address of the animal the red mark shows over, its blow about to land; nil while none), "warning" (one the yellow mark
+// shows over, winding up; nil while none).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -32,9 +34,12 @@ namespace rtc::hud
     struct Bar
     {
         Widget bar, name, posture;
-        Widget warn;   // a red mark over it for the last moment of its wind-up (its blow about to land): dodge or guard now
+        Widget warn;   // a mark over it while it winds up an attack: yellow, then red for the last moment (its blow about
+                       // to land): dodge or guard now
+        bool warn_hot = true;   // the mark's colour now: red (true) or yellow
         bool big = false;
     };
+    inline auto warn_color(bool hot) -> wcmods::UiColor { return wcmods::UiColor::hex(hot ? L"#ff4b3a" : L"#ffd84a"); }
     struct State
     {
         Widget canvas;
@@ -46,6 +51,8 @@ namespace rtc::hud
         std::map<UObject*, Bar> ally_bars;   // your party's (allies.hpp), green, with their names
         int shown = -1;
         bool target_shown = false;
+        UObject* marked{};   // the animal the red mark showed over last frame (shared as "mark")
+        UObject* warned{};   // one the yellow mark showed over (shared as "warning")
     };
     inline auto state() -> State&
     {
@@ -85,7 +92,7 @@ namespace rtc::hud
             s.canvas.add(b.posture).size(300, 8);
             b.posture.set_opacity(0.92f);
         }
-        b.warn = wcmods::ui::text(L"!", {.size = big ? 46.0f : 32.0f, .color = wcmods::UiColor::hex(L"#ff6b5a")});
+        b.warn = wcmods::ui::text(L"!", {.size = big ? 46.0f : 32.0f, .color = warn_color(true)});
         s.canvas.add(b.warn).auto_size(true);
         b.warn.hide();
         return b;
@@ -189,6 +196,8 @@ namespace rtc::hud
         if (target && !enemies::known(target) && !enemies::defeated(target)) enemies::of(target);
         int shown = 0;
         bool target_shown = false;
+        UObject* marked = nullptr;   // the animal with the red mark
+        UObject* warned = nullptr;   // one with the yellow
         std::erase_if(s.bars, [](auto& e) {
             const bool keep = game::staying(e.first) && enemies::known(e.first) && !enemies::defeated(e.first);
             if (!keep) remove_bar(e.second);
@@ -196,7 +205,20 @@ namespace rtc::hud
         });
         for (auto& [animal, e] : enemies::state().all)
         {
-            if (e.defeated || (e.hits == 0 && animal != target) || !game::staying(animal)) continue;
+            // a bar over one your cat's hit, the one it's locked on to, and one winding up an attack at it (its mark
+            // shows whether or not it's locked on to: the one that matters most isn't, coming in from the side)
+            const bool attacking_you = foes::winding_up(animal) || foes::striking_soon(animal);
+            if (e.defeated || (e.hits == 0 && animal != target && !attacking_you) || !game::staying(animal))
+            {
+                if (auto it = s.bars.find(animal); it != s.bars.end())   // (was locked on to, or attacking: hidden now)
+                {
+                    it->second.bar.hide();
+                    if (it->second.name) it->second.name.hide();
+                    if (it->second.posture) it->second.posture.hide();
+                    if (it->second.warn) it->second.warn.hide();
+                }
+                continue;
+            }
             const bool big = animal == target;
             auto it = s.bars.find(animal);
             if (it != s.bars.end() && it->second.big != big)
@@ -221,13 +243,22 @@ namespace rtc::hud
             place(b.bar, screen->first, screen->second, 0.5, 1.0);
             b.bar.show_passive();
             ++shown;
-            // its blow about to land: the mark over it for the last moment of its wind-up (dodge or guard now)
+            // winding up an attack: the mark over it, yellow (don't start an attack now), red for the last moment when its
+            // blow is about to land (dodge or guard now)
             if (b.warn)
             {
-                if (foes::striking_soon(animal))
+                const bool hot = foes::striking_soon(animal);
+                if (hot || foes::winding_up(animal))
                 {
+                    if (hot != b.warn_hot)
+                    {
+                        b.warn.set_color(warn_color(hot));
+                        b.warn_hot = hot;
+                    }
                     place(b.warn, screen->first, screen->second - (big ? 62 : 16), 0.5, 1.0);
                     b.warn.show_passive();
+                    if (hot) marked = animal;
+                    else if (!warned) warned = animal;
                 }
                 else b.warn.hide();
             }
@@ -282,8 +313,12 @@ namespace rtc::hud
         }
         if (shown != s.shown) wcmods::share("bars", shown);
         if (target_shown != s.target_shown) wcmods::share("target_bar", target_shown);
+        if (marked != s.marked) wcmods::share("mark", marked ? wcmods::Json(static_cast<double>(game::id(marked))) : wcmods::Json());
+        if (warned != s.warned) wcmods::share("warning", warned ? wcmods::Json(static_cast<double>(game::id(warned))) : wcmods::Json());
         s.shown = shown;
         s.target_shown = target_shown;
+        s.marked = marked;
+        s.warned = warned;
     }
 
     // Real-time combat off: everything taken off the HUD.
@@ -297,5 +332,9 @@ namespace rtc::hud
         s.shown = 0;
         wcmods::share("target_bar", false);
         s.target_shown = false;
+        if (s.marked) wcmods::share("mark", wcmods::Json());
+        if (s.warned) wcmods::share("warning", wcmods::Json());
+        s.marked = nullptr;
+        s.warned = nullptr;
     }
 } // namespace rtc::hud

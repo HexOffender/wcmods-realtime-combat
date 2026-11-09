@@ -26,18 +26,22 @@ notice your cat, it pounces on one, or walks into one. Instead:
 | **The killing blow** on a [Clan life](https://github.com/HexOffender/wcmods-clan-life) cat that's yielded | H | D-pad down |
 
 - **Stamina** is the game's own (its bar at the bottom of the screen). Attacks, dodges and blocked hits spend
-  it, and none comes back while you act or for a moment after. An action needs at least half its cost.
+  it, and none comes back while you act or for a moment after. An attack needs at least half its cost; a
+  dodge needs only a scrap, so a cat can always leap aside, though a dodge from an empty bar leaves nothing
+  for an attack after it.
 - **Dodging:** your cat can't be hurt for the first 0.55 s of a dodge. A dodge takes it 1.5 m, a cat's hop
-  (`dodge_distance_m` in the settings, 0.5 to 5).
+  (`dodge_distance_m` in the settings, 0.5 to 5). Pressed during your own attack's wind-up, the dodge waits and
+  goes the moment your blow lands, so a dodge pressed at the mark is never lost to an attack already begun.
 - **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
   to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
   in front. A light attack pressed as one lands follows it. Locked on, a strike keeps facing its target and steps
   in toward it as it comes down, up to 1.2 m (a heavy one 0.9 m), so an animal pacing just out of reach is hit.
 - **The animals fight back, each the way its kind does.** One within 4 m, or one you hit, comes toward your
   cat, but only to a couple of metres off, and paces round it, watching. They attack one at a time: one rushes
-  in with a wind-up you can see coming, following your cat until the last moment, when it's committed: a red
-  **!** over it then says dodge or block now (a dodge then is safe right through the blow), and after striking
-  it's open for a moment before it backs off again. Hit one in its wind-up and it reels.
+  in with a wind-up you can see coming, a yellow **!** over it from the start (don't begin an attack now),
+  following your cat until the last moment, when it's committed: the **!** turns red then, and says dodge or
+  block now (a dodge then is safe right through the blow). After striking it's open for a moment before it
+  backs off again. Hit one in its wind-up and it reels.
   - **Some guard** when you attack them from in front (a badger most, a fox often): a guarded hit does a fifth
     of its damage and fills the animal's **posture** (the gold bar under its health; a heavy attack fills it
     twice as fast). Full, its guard breaks and it reels, open to a riposte. Keep swinging at a guard and it
@@ -142,6 +146,13 @@ or where `realtime-combat\wcmods.props` says.
   its real keys. They change what Sandbox mode says about the cat in play, and put it back after each test.
   Sandbox mode clears a sandbox cat's story quests as it comes into the forest. The run backs the save up
   first (`python wcmods.py restore <name>`, printed as the run starts), so you can put them back.
+- **Scripted fights** (`tools/fight_run.py`, run the same way: `python wcmods.py agent run tools/fight_run.py 50
+  "dodger:fox,careful:fox"`): a scripted player fights a live titan fox or rabbit for 50 s at a time, four ways
+  (never dodging; attacking all the time and dodging a quarter second after the red mark; the same but holding
+  off while the mark shows; striking only in openings), with everything the mod shares logged eight times a
+  second to `fight_run.json`. `python tools/analyze_fight.py` says how many strikes landed and why the rest
+  missed, and for each of the animal's attacks when the mark came, when the dodge went and whether the blow
+  hit. That's how the feel changes get their numbers.
 
 ## Releasing
 

@@ -1,6 +1,7 @@
-"""Step 4, the dodge (docs/plan.md): Left Alt hops your cat about 3 m the way the player's moving, or straight back when
-they aren't; the game's side hop plays; nothing hurts your cat for its first 0.4 s; it costs 15 stamina; a wall (here
-a rabbit) stops it short; it can cut an attack short once the attack has landed, not before.
+"""Step 4, the dodge (docs/plan.md): Left Alt hops your cat about 1.5 m the way the player's moving, or straight back when
+they aren't; the game's side hop plays; nothing hurts your cat for its first 0.55 s; it costs 15 stamina; a wall (here
+a rabbit) stops it short; it can cut an attack short once the attack has landed, and pressed before that it waits for
+the landing.
 
 Run as test_sandbox_gate.py says."""
 import math
@@ -120,20 +121,27 @@ def test_too_little_stamina(agent):
 
 
 def test_out_of_an_attack(agent):
-    """A dodge in an attack's wind-up does nothing; once it's landed, the dodge cuts it short."""
-    made = h.get(agent, "dodges") or 0
-    h.action(agent, "light")
-    h.action(agent, "dodge_right")          # 0.15 s in: the wind-up
-    time.sleep(0.1)
-    assert (h.get(agent, "dodges") or 0) == made and h.get(agent, "attack") == "light"
-    h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
+    """A dodge pressed in an attack's wind-up waits, and goes the moment the attack lands (cutting the rest of it
+    short); pressed once it's landed, the dodge cuts it short at once."""
+    made, kept = h.get(agent, "dodges") or 0, h.get(agent, "dodges_kept") or 0
+    agent.lua(f'WCModsCpp.share("RealtimeCombat.action", "light {next(h._count)}") return true')
+    time.sleep(0.12)                          # the wind-up (it lands at 0.38 s)
+    agent.lua(f'WCModsCpp.share("RealtimeCombat.action", "dodge_right {next(h._count)}") return true')
+    got = agent.lua(f'return {{ {h.MOD}.get("dodges") or 0, {h.MOD}.get("attack") or "" }}')
+    assert got[0] == made and got[1] == "light", f"the dodge went in the wind-up ({got})"
+    h.until(agent, f'({h.MOD}.get("dodges") or 0) > {made}', 1, "the kept dodge to go as the attack lands")
+    assert (h.get(agent, "dodges_kept") or 0) == kept + 1, "the dodge wasn't the kept one"
+    assert h.get(agent, "attack") == "", "the attack went on after the dodge"
+    h.until(agent, f'not {h.MOD}.get("dodge")', 3, "the dodge to end")
     time.sleep(0.7)
     agent.lua("Game.cat():setStamina(100) return true")
+    made = h.get(agent, "dodges") or 0
     h.action(agent, "light")
     time.sleep(0.4)                          # landed at 0.38 s
     h.action(agent, "dodge_right")
     h.until(agent, f'({h.MOD}.get("dodges") or 0) > {made}', 2, "the dodge to cut the attack short")
     assert h.get(agent, "attack") == ""
+    assert (h.get(agent, "dodges_kept") or 0) == kept + 1, "a dodge after the landing was counted as kept"
 
 
 def test_the_real_key(agent):
