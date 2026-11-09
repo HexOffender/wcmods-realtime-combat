@@ -47,8 +47,10 @@ def _dodge(agent, word):
 
 
 def _montage(agent):
+    """The montage playing on your cat, or None. (With nothing playing, GetCurrentActiveMontage gives an object that
+    isn't valid, and calling anything on it crashes the game: IsValid first.)"""
     return agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                     'return m and m:GetFName():ToString()')
+                     'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
 
 
 def test_each_way(agent):

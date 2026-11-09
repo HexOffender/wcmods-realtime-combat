@@ -60,7 +60,7 @@ def test_a_light_attack(agent):
     h.until(agent, f'({h.MOD}.get("attacks") or 0) > {before}', 2, "the attack to start")
     assert h.get(agent, "attack") == "light"
     playing = agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                        'return m and m:GetFName():ToString()')
+                        'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
     assert playing == "AM_UM_Quick_Claw", playing
     h.until(agent, f'{h.MOD}.get("attack") == ""', 3, "the attack to end")
     stamina = agent.lua("return Game.cat():stamina()")   # first: some comes back 0.6 s after
@@ -122,7 +122,7 @@ def test_defeat(agent):
     h.until_value(agent, "locked", False)
     assert h.get(agent, "released") == "defeated"
     playing = agent.lua('local m = Game.get(WCMODS_SCENE.front, "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                        'return m and m:GetFName():ToString()')
+                        'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
     assert playing and "Lose" in playing, playing
     h.until(agent, "not Game.alive(WCMODS_SCENE.front)", 8, "the defeated rabbit to be taken away")
 

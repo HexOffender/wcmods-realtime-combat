@@ -51,7 +51,7 @@ def test_a_drink_heals(agent):
     charges = h.get(agent, "flask")
     _drink(agent)
     playing = agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                        'return m and m:GetFName():ToString()')
+                        'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
     assert playing == "AM_Interact_Sniffing", playing
     assert h.get(agent, "flask") == charges - 1
     h.until(agent, f'not {h.MOD}.get("drinking")', 3, "the drink to end")
@@ -133,7 +133,7 @@ def test_sleeping_fills_it(agent):
     playing = agent.lua("""local c = Game.get(Game.player(), "PlayMontageComponent")
         c:K2_PlayMontageOfTag(Game.tag("Animation.Exploration.Interaction.Sleep.1"), 1, true, false, false)
         local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage()
-        return m and m:GetFName():ToString()""")
+        if m and m:IsValid() then return m:GetFName():ToString() end return nil""")
     assert playing and "Sleep" in playing, playing
     try:
         h.until(agent, f'{h.MOD}.get("flask") == {h.MOD}.get("flask_max")', 2, "the flask to fill")

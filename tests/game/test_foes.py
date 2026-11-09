@@ -121,7 +121,7 @@ def test_its_attack_hurts(agent):
     before = _health(agent)
     h.until(agent, f'({h.MOD}.get("cat_hits") or 0) > {hits}', 12, "the rabbit's attack to land on your cat")
     playing = agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                        'return m and m:GetFName():ToString()')
+                        'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
     took = before - _health(agent)
     damage = agent.lua(f"return {DAMAGE}")
     assert abs(took - damage) < 1, f"your cat took {took:.1f}, not {damage:.1f}"
