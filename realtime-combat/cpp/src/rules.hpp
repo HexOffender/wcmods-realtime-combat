@@ -430,14 +430,17 @@ namespace rtc
         double safe = 0.55;      // real seconds from the press in which nothing hurts your cat
         double stamina = 15;
         double least = 1;        // the least stamina it needs (any at all: see can_spend)
+        double jump_air = 0.45;  // a plain jump (no side hop: dodge_pose) is in the air this long: the game's own jump
+                                 // animation shows for it (the anim blueprint follows the movement), and needs the time
     };
     inline auto duration(const DodgeSpec& s) -> double { return (s.to - s.from) / s.rate; }
     // Real seconds from the press when the slide starts and ends.
     inline auto slide_start(const DodgeSpec& s) -> double { return std::max(0.0, s.slide_from - s.from) / s.rate; }
     inline auto slide_end(const DodgeSpec& s) -> double { return (s.slide_to - s.from) / s.rate; }
     inline auto slide_speed(const DodgeSpec& s) -> double { return s.distance / std::max(0.01, slide_end(s) - slide_start(s)); }
-    // The hop as a leap: its distance over the time it's in the air.
-    inline auto hop_leap(const DodgeSpec& s, double gravity = 980) -> Leap { return leap_for(s.distance, slide_end(s) - slide_start(s), gravity); }
+    // The hop as a leap: its distance over the time it's in the air (the side hop's window; a plain jump's jump_air).
+    inline auto hop_air(const DodgeSpec& s, bool jump) -> double { return jump ? s.jump_air : slide_end(s) - slide_start(s); }
+    inline auto hop_leap(const DodgeSpec& s, double gravity = 980) -> Leap { return leap_for(s.distance, hop_air(s, false), gravity); }
     inline auto safe_at(const DodgeSpec& s, double t) -> bool { return t >= 0 && t < s.safe; }
 
     // Which way it goes: the way the player's moving (forward and right from -1 to 1, as the camera sees them), or
@@ -448,19 +451,26 @@ namespace rtc
         return camera_yaw + std::atan2(right, forward) * degrees_per_radian;
     }
 
-    // How it's played: a hop to the side the dodge goes, with your cat facing as it does when that's to its side;
-    // forward or back, your cat's turned so the hop to its right goes that way.
+    // How it's played. Locked on, your cat faces its target first (`target_yaw`): a dodge to a side of that is the
+    // game's side hop, whose animation goes that way; one toward or away from it is a plain jump, with no animation of
+    // its own (the game has none for a forward or back dodge: the engine's own in-air pose shows). Not locked on, it's
+    // a jump the way it goes, your cat turned to face that way: a cat leaps where it looks. (The first cut picked the
+    // hop by the dodge's direction relative to your cat's facing and turned it 90 degrees for a forward or back one,
+    // but the game turns a walking cat toward where it walks, so nearly every dodge made on the move became a
+    // sideways hop: "the cat is never facing the correct way", the player said.)
     struct DodgePose
     {
-        bool right = true;
-        double cat_yaw = 0;
+        bool jump = true;      // a plain jump (no animation), else the game's side hop
+        bool right = true;     // the side hop's side
+        double cat_yaw = 0;    // which way your cat faces for it
     };
-    inline auto dodge_pose(double cat_yaw, double yaw) -> DodgePose
+    inline auto dodge_pose(double yaw, std::optional<double> target_yaw) -> DodgePose
     {
-        const double a = turn(cat_yaw, yaw);
-        if (a >= 30 && a <= 150) return {true, cat_yaw};
-        if (a <= -30 && a >= -150) return {false, cat_yaw};
-        return {true, yaw - 90};
+        if (!target_yaw) return {true, true, yaw};
+        const double a = turn(*target_yaw, yaw);
+        if (a >= 30 && a <= 150) return {false, true, *target_yaw};
+        if (a <= -30 && a >= -150) return {false, false, *target_yaw};
+        return {true, true, *target_yaw};
     }
 
     // A dodge can cut an attack short once it's landed, not in its wind-up.

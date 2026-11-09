@@ -200,12 +200,15 @@ namespace rtc::attacks
             const double want = leap_distance(sp, gap);
             if (want > 0 && yaw && game::leap(me, *yaw, want, leap_air(sp)) <= 0) s.step_blocked = 1;
         }
-        // in the air, locked on: steered at the target, which may have moved meanwhile, to come down in reach
+        // in the air, locked on: steered at the target, which may have moved meanwhile, to come down in reach, though
+        // no farther in all than the leap may go (its step, a lunge its carry)
         if (s.leapt && !s.landed && target && game::airborne(me))
-            if (auto at = game::at(me), them = game::at(target); at && them)
+            if (auto at = game::at(me), them = game::at(target); at && them && s.from)
             {
                 const double left = hit_at(sp) - s.elapsed;
-                if (left >= 0.05) game::steer(me, yaw_to(*at, *them), steer_speed(flat_distance(*at, *them) - (sp.reach - 40), left));
+                const double allowed = leap_distance(sp, 1e9) - flat_distance(*s.from, *at);
+                const double gap = std::min(flat_distance(*at, *them) - (sp.reach - 40), allowed);
+                if (left >= 0.05) game::steer(me, yaw_to(*at, *them), steer_speed(gap, left));
             }
         // on the ground (before the leap, and come down), your cat stays put: held keys would creep it along, legs
         // still (the animation has the whole body)

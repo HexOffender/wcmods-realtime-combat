@@ -91,7 +91,7 @@ def test_falling(agent):
     h.action(agent, "hurt")   # 5: more than it has
     h.until(agent, f'({h.MOD}.get("falls") or 0) > {falls}', 2, "your cat to fall")
     playing = agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                        'return m and m:GetFName():ToString()')
+                        'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
     assert playing and "Lose" in playing, playing
     assert agent.lua("return Game.cat():health()") >= 1, "your cat's health went to 0"
     h.until(agent, f'not {h.MOD}.get("falling")', 20, "your cat to be back at camp")

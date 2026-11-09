@@ -30,8 +30,11 @@ notice your cat, it pounces on one, or walks into one. Instead:
   dodge needs only a scrap, so a cat can always leap aside, though a dodge from an empty bar leaves nothing
   for an attack after it.
 - **Dodging:** your cat can't be hurt for the first 0.55 s of a dodge. A dodge leaps it 1.5 m, a cat's hop
-  (`dodge_distance_m` in the settings, 0.5 to 5). Pressed during your own attack's wind-up, the dodge waits and
-  goes the moment your blow lands, so a dodge pressed at the mark is never lost to an attack already begun.
+  (`dodge_distance_m` in the settings, 0.5 to 5), the way you're moving (standing still: back). Locked on, your
+  cat faces its target and hops to the side with the game's side hop, or jumps toward or away from it; not
+  locked on, it turns to face the way it's going and jumps. Pressed during your own attack's wind-up, the dodge
+  waits and goes the moment your blow lands, so a dodge pressed at the mark is never lost to an attack already
+  begun.
 - **Attacking:** a light attack (and a lunge) lands on one animal in front of your cat: the one you're locked on
   to when it's in reach, else the nearest it can see. The heavy attack is a wide swing: it lands on every animal
   in front. A light attack pressed as one lands follows it. Locked on, a strike keeps facing its target and leaps

@@ -1,7 +1,8 @@
-"""Step 4, the dodge (docs/plan.md): Left Alt hops your cat about 1.5 m the way the player's moving, or straight back when
-they aren't; the game's side hop plays; nothing hurts your cat for its first 0.55 s; it costs 15 stamina; a wall (here
-a rabbit) stops it short; it can cut an attack short once the attack has landed, and pressed before that it waits for
-the landing.
+"""Step 4, the dodge (docs/plan.md): Left Alt leaps your cat about 1.5 m the way the player's moving, or straight back
+when they aren't: not locked on, a jump that way, your cat turned to face it; locked on, your cat faces its target and
+the game's side hop plays for a dodge to a side of it. Nothing hurts your cat for its first 0.55 s; it costs 15 stamina;
+a wall (here a rabbit) stops it short; it can cut an attack short once the attack has landed, and pressed before that
+it waits for the landing.
 
 Run as test_sandbox_gate.py says."""
 import math
@@ -46,24 +47,24 @@ def _dodge(agent, word):
 
 
 def _montage(agent):
+    """The montage playing on your cat, or None. (With nothing playing, GetCurrentActiveMontage gives an object that
+    isn't valid, and calling anything on it crashes the game: IsValid first.)"""
     return agent.lua('local m = Game.get(Game.player(), "Mesh"):GetAnimInstance():GetCurrentActiveMontage() '
-                     'return m and m:GetFName():ToString()')
+                     'if m and m:IsValid() then return m:GetFName():ToString() end return nil')
 
 
 def test_each_way(agent):
-    """Right, left, forward and back of the camera: about 1.5 m each (the settings' dodge_distance_m), the right way,
-    with the hop to that side."""
+    """Right, left, forward and back of the camera, nothing locked on: about 1.5 m each (the settings' dodge_distance_m),
+    the right way, as a jump (no animation of its own) with your cat turned to face the way it goes."""
     view = h.control_yaw(agent)
     for word, way in (("dodge_right", 90), ("dodge_left", -90), ("dodge_forward", 0), ("dodge_back", 180)):
         agent.lua("Game.cat():setStamina(100) return true")
         before = h.get(agent, "dodges") or 0
         start = _at(agent)
-        facing = agent.lua("return Game.player():K2_GetActorRotation().Yaw")
-        side = h.turn(facing, view + way)   # where the dodge goes, from your cat's facing
-        hop = "AM_Dodge_R" if 30 <= side <= 150 else "AM_Dodge_L" if -150 <= side <= -30 else "AM_Dodge_R"
         h.action(agent, word)
         h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
         playing = _montage(agent)
+        facing = agent.lua("return Game.player():K2_GetActorRotation().Yaw")
         h.until(agent, f'not {h.MOD}.get("dodge")', 3, "the dodge to end")
         end = _at(agent)
         moved = math.hypot(end[0] - start[0], end[1] - start[1])
@@ -71,8 +72,44 @@ def test_each_way(agent):
         assert 90 < moved < 230, f"{word}: moved {moved:.0f} units"
         off = abs(h.turn(view + way, went))
         assert off < 25, f"{word}: went {off:.0f} degrees off the way asked"
-        assert playing == hop, f"{word}: {playing}, with the dodge {side:.0f} degrees right of your cat's facing"
+        assert playing is None or "Dodge" not in playing, f"{word}: the side hop {playing} played for a jump"
+        assert abs(h.turn(view + way, facing)) < 25, f"{word}: your cat faced {h.turn(view + way, facing):.0f} degrees off the way it went"
         time.sleep(0.7)   # the stamina pause
+
+
+def test_locked_on_a_side_hop_faces_the_target(agent):
+    """Locked on to a rabbit 3 m ahead, a dodge to the right is the game's right hop, your cat facing the rabbit as it
+    goes, about 1.5 m to the camera's right; a dodge back is a jump away from it, still facing it."""
+    h.scene(agent, {"ahead": (0, 300)})
+    agent.lua("Game.cat():setStamina(100) return true")
+    h.action(agent, "lock")
+    h.until_value(agent, "locked", True)
+    view = h.control_yaw(agent)
+    try:
+        for word, way, hop in (("dodge_right", 90, "AM_Dodge_R"), ("dodge_back", 180, None)):
+            agent.lua("Game.cat():setStamina(100) return true")
+            before = h.get(agent, "dodges") or 0
+            start = _at(agent)
+            to_rabbit = h.yaw_to(agent, "ahead")   # as the dodge begins (a hop to the side moves the rabbit's bearing)
+            h.action(agent, word)
+            h.until(agent, f'({h.MOD}.get("dodges") or 0) > {before}', 2, "the dodge to start")
+            playing = _montage(agent)
+            facing = agent.lua("return Game.player():K2_GetActorRotation().Yaw")
+            h.until(agent, f'not {h.MOD}.get("dodge")', 3, "the dodge to end")
+            end = _at(agent)
+            moved = math.hypot(end[0] - start[0], end[1] - start[1])
+            went = math.degrees(math.atan2(end[1] - start[1], end[0] - start[0]))
+            assert 90 < moved < 230, f"{word}: moved {moved:.0f} units"
+            assert abs(h.turn(view + way, went)) < 30, f"{word}: went {h.turn(view + way, went):.0f} degrees off the way asked"
+            assert abs(h.turn(to_rabbit, facing)) < 25, f"{word}: your cat faced {h.turn(to_rabbit, facing):.0f} degrees off the rabbit"
+            if hop:
+                assert playing == hop, f"{word}: {playing} played, not the {hop} hop"
+            else:
+                assert playing is None or "Dodge" not in playing, f"{word}: the side hop {playing} played for a jump"
+            time.sleep(0.7)
+    finally:
+        h.action(agent, "lock")
+        h.clear_scene(agent)
 
 
 def test_standing_still_goes_back(agent):
