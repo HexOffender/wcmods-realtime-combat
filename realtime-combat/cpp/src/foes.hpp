@@ -112,13 +112,20 @@ namespace rtc::foes
 
 
     // Whether its blow is about to land: the last `commit` seconds of its wind-up (after a feint's hold), when it's
-    // committed to where it strikes. The HUD marks it: the moment to dodge or guard.
+    // committed to where it strikes. The HUD marks it red: the moment to dodge or guard.
     inline auto striking_soon(UObject* animal) -> bool
     {
         auto it = state().all.find(animal);
         if (it == state().all.end() || it->second.foe.state != FoeState::WindUp) return false;
         const Foe& f = it->second.foe;
         return f.t >= f.strike_at - spec_for(animal).commit;
+    }
+    // Whether it's winding up an attack at all (its blow not landed yet). The HUD marks it yellow from the start: don't
+    // begin an attack of your own now, get ready to dodge.
+    inline auto winding_up(UObject* animal) -> bool
+    {
+        auto it = state().all.find(animal);
+        return it != state().all.end() && it->second.foe.state == FoeState::WindUp && !it->second.foe.landed;
     }
 
     // Its posture as a part of what breaks its guard (0 to 1), for the HUD; nullopt for an animal not fighting.

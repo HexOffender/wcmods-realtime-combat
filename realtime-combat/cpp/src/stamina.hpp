@@ -22,11 +22,12 @@ namespace rtc::stamina
         return s;
     }
 
-    // Spend `cost` for an action: false, with nothing spent, when there's too little.
-    inline auto spend(double cost) -> bool
+    // Spend `cost` for an action: false, with nothing spent, when there's too little (half the cost, or `least` when
+    // that's less: a dodge needs only a scrap).
+    inline auto spend(double cost, double least = -1) -> bool
     {
         auto r = wcmods::cat().stamina();
-        if (!r || !can_spend(*r.value, cost)) return false;
+        if (!r || !(least >= 0 ? can_spend(*r.value, cost, least) : can_spend(*r.value, cost))) return false;
         *r.value = static_cast<float>(rtc::spend(*r.value, cost));
         state().resource = r;
         state().held = *r.value;

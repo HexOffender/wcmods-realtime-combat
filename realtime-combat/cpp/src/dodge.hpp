@@ -3,11 +3,13 @@
 // the game's side hop (Animation.Combat.Dodge.Left/Right) to that side, or, forward and back, your cat turned so its
 // right hop goes that way, and slid along the ground while the hop's in the air (rules.hpp's DodgeSpec): 1.5 m, a cat's
 // hop, unless settings.json's dodge_distance_m says otherwise (0.5 to 5). For its first 0.55 s nothing hurts your cat
-// (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an attack short once the attack has landed.
+// (safe(), which step 5's enemies ask). It costs 15 stamina, and can cut an attack short once the attack has landed; a
+// dodge pressed in an attack's wind-up is kept, and made the moment the attack lands (the player saw the animal's mark
+// and pressed; a press swallowed there was a hit taken, seen in scripted fights).
 //
 // Shared for tests: "dodge" (true while one plays), "dodges" (how many made), "dodge_safe" (true while nothing hurts
 // your cat), "dodge_safe_starts" (how many safe moments have begun), "dodge_way" (the yaw it went), "dodge_refused"
-// (dodges not made for want of stamina).
+// (dodges not made for want of stamina), "dodges_kept" (dodges pressed in an attack's wind-up and made as it landed).
 #pragma once
 
 #include <WCMods/WCMods.hpp>
@@ -29,8 +31,12 @@ namespace rtc::dodge
         double way = 0;          // the yaw it goes
         UObject* montage{};
         bool was_safe = false;
-        int made = 0, refused = 0, safe_starts = 0;
+        int made = 0, refused = 0, safe_starts = 0, kept_made = 0;
         double distance = 150;   // cm it slides: settings.json's dodge_distance_m
+        // a dodge pressed in an attack's wind-up, kept for when the attack lands (for up to `kept_for` seconds)
+        bool kept = false;
+        std::optional<double> kept_way;
+        double kept_for = 0;
     };
     inline auto state() -> State&
     {
@@ -59,6 +65,7 @@ namespace rtc::dodge
     inline auto end() -> void
     {
         State& s = state();
+        s.kept = false;   // (a hit landing ends a dodge too: a dodge kept through the attack it cut short goes with it)
         if (!s.on) return;
         UObject* me = wcmods::player();
         if (me && s.montage && game::montage_on(me, s.montage)) game::stop_montage(me, s.montage, 0.2);
@@ -80,7 +87,7 @@ namespace rtc::dodge
         if (!view) view = game::view_yaw();
         if (!me || !facing || !view) return false;
         const DodgeSpec d = spec();
-        if (!stamina::spend(d.stamina))
+        if (!stamina::spend(d.stamina, d.least))
         {
             wcmods::share("dodge_refused", ++s.refused);
             return false;
@@ -112,17 +119,37 @@ namespace rtc::dodge
     inline auto frame(double dt, const input::Pressed& p) -> void
     {
         State& s = state();
+        // whether an attack playing can be cut short now (once it's landed), or none is playing
+        auto attack_lets_go = [] {
+            if (!attacks::busy()) return true;
+            auto& a = attacks::state();
+            return a.now && can_dodge_out_of(spec(*a.now), a.elapsed);
+        };
         if (!s.on && p[input::Action::Dodge])
         {
-            // out of an attack once it's landed; not in its wind-up
-            if (attacks::busy())
+            if (!attack_lets_go())
             {
-                auto& a = attacks::state();
-                if (!a.now || !can_dodge_out_of(spec(*a.now), a.elapsed)) return;
-                attacks::end();
+                // in an attack's wind-up: kept, and made as the attack lands
+                s.kept = true;
+                s.kept_way = p.dodge_way;
+                s.kept_for = 0.6;
+                return;
             }
+            if (attacks::busy()) attacks::end();
             start(p.dodge_way);
             return;
+        }
+        if (!s.on && s.kept)
+        {
+            s.kept_for -= dt;
+            if (s.kept_for <= 0) s.kept = false;
+            else if (attack_lets_go())
+            {
+                s.kept = false;
+                if (attacks::busy()) attacks::end();
+                if (start(s.kept_way)) wcmods::share("dodges_kept", ++s.kept_made);
+                return;
+            }
         }
         if (!s.on) return;
         const DodgeSpec d = spec();

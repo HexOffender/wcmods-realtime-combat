@@ -147,6 +147,23 @@ def test_a_dodge_avoids_it(agent):
     assert (h.get(agent, "cat_hits") or 0) == hits and _health(agent) == before, "the attack hurt your cat"
 
 
+def test_the_mark_shows_before_the_blow(agent):
+    """The HUD's mark over it: yellow from the start of its wind-up (shared as "warning": its address), red (shared as
+    "mark") for the last 0.4 s, when it's committed to its blow, and gone as the blow lands."""
+    _until_foe(agent, "near", "windup", 12)
+    started = time.time()
+    h.until(agent, f'{h.MOD}.get("warning") == {IDS["near"]} or {h.MOD}.get("mark") == {IDS["near"]}', 0.5, "the yellow mark")
+    assert h.get(agent, "mark") is None, "the mark was red from the start of the wind-up"
+    h.until(agent, f'{h.MOD}.get("mark") == {IDS["near"]}', 1.5, "the mark over the rabbit to turn red")
+    marked = time.time()
+    _until_foe(agent, "near", ("recover", "retreat", "pace"), 2)
+    landed = time.time()
+    agent.lua("Game.cat():heal() return true")
+    assert marked - started > 0.2, f"the mark turned red {marked - started:.2f} s into the wind-up, not near its end"
+    assert 0.2 < landed - marked < 0.7, f"the red mark showed {landed - marked:.2f} s before the blow (0.4 by the rules)"
+    h.until(agent, f'{h.MOD}.get("mark") == nil and {h.MOD}.get("warning") == nil', 1, "the mark to go after the blow")
+
+
 def test_one_attacks_at_a_time(agent):
     """With three fighting, never two attacking at once."""
     more = h.scene(agent, {"near": (0, 300), "left": (-35, 280), "right": (35, 280)})

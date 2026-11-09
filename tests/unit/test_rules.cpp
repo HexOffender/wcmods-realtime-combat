@@ -202,6 +202,9 @@ static void stamina_runs_down_to_nothing()
 {
     CHECK(rtc::can_spend(100, 12) && rtc::can_spend(6, 12));
     CHECK(!rtc::can_spend(5.9, 12) && !rtc::can_spend(0, 12));
+    // a dodge needs only a scrap (its spec's `least`), never more than half its cost
+    CHECK(rtc::can_spend(1, 15, 1) && !rtc::can_spend(0.5, 15, 1) && rtc::can_spend(7.5, 15, 100) && !rtc::can_spend(7, 15, 100));
+    CHECK(rtc::DodgeSpec{}.least <= 1);
     CHECK(rtc::stamina_pause > 0 && rtc::stamina_pause < 2);
     CHECK(near(rtc::spend(100, 12), 88));
     CHECK(near(rtc::spend(5, 12), 0));

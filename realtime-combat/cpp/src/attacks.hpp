@@ -35,6 +35,7 @@ namespace rtc::attacks
         double elapsed = 0;
         bool landed = false;
         double stepped = 0;           // cm this strike has stepped in (AttackSpec::step)
+        int step_blocked = 0;         // frames its step-in slide was refused (for tests: shared as the strike ends)
         std::optional<Attack> next;   // pressed during the last part of this one
         int made = 0, hits = 0, refused = 0;
         double damage_multiplier = 1;
@@ -83,6 +84,7 @@ namespace rtc::attacks
         s.elapsed = 0;
         s.landed = false;
         s.stepped = 0;
+        s.step_blocked = 0;
         s.next.reset();
         wcmods::share("attack", sp.name);
         wcmods::share("attacks", ++s.made);
@@ -97,6 +99,8 @@ namespace rtc::attacks
         s.now.reset();
         s.montage = nullptr;
         wcmods::share("attack", "");
+        wcmods::share("step_moved", s.stepped);
+        wcmods::share("step_blocked", s.step_blocked);
     }
 
     // The moment it lands: on one animal (or Clan life cat) in reach in front of your cat, the one it's locked on to or
@@ -113,6 +117,17 @@ namespace rtc::attacks
         const double damage = cat_damage(a, level ? *level : 1, s.damage_multiplier);
         std::vector<UObject*> candidates;   // in reach, nearest first (game::fighters sorts by distance)
         std::optional<size_t> locked;
+        // for tests: where the target was as the blow came down (its distance, how far off your cat's facing, whether it
+        // could be seen), -1 with nothing locked
+        if (UObject* t = lockon::locked())
+        {
+            auto them = game::at(t);
+            wcmods::share("land_dist", them ? flat_distance(*at, *them) : -1.0);
+            wcmods::share("land_angle", them ? std::abs(turn(*yaw, yaw_to(*at, *them))) : -1.0);
+            wcmods::share("land_dz", them ? them->z - at->z : -1.0);
+            wcmods::share("land_seen", them ? game::can_see(t) : false);
+        }
+        else wcmods::share("land_dist", -1.0);
         for (const wcmods::Animal& animal : game::fighters(sp.reach + 200))
         {
             if (enemies::defeated(animal.actor)) continue;
@@ -174,8 +189,11 @@ namespace rtc::attacks
             }
             const double move = std::min({gap, sp.step - s.stepped, 500 * dt});
             if (move > 0)
-                if (auto yaw = game::facing(me))
-                    if (game::slide(me, *yaw, move)) s.stepped += move;
+            {
+                auto yaw = game::facing(me);
+                if (yaw && game::slide(me, *yaw, move)) s.stepped += move;
+                else ++s.step_blocked;
+            }
         }
         if (!s.landed && s.elapsed >= hit_at(sp))
         {
