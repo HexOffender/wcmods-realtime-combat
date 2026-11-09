@@ -448,19 +448,26 @@ namespace rtc
         return camera_yaw + std::atan2(right, forward) * degrees_per_radian;
     }
 
-    // How it's played: a hop to the side the dodge goes, with your cat facing as it does when that's to its side;
-    // forward or back, your cat's turned so the hop to its right goes that way.
+    // How it's played. Locked on, your cat faces its target first (`target_yaw`): a dodge to a side of that is the
+    // game's side hop, whose animation goes that way; one toward or away from it is a plain jump, with no animation of
+    // its own (the game has none for a forward or back dodge: the engine's own in-air pose shows). Not locked on, it's
+    // a jump the way it goes, your cat turned to face that way: a cat leaps where it looks. (The first cut picked the
+    // hop by the dodge's direction relative to your cat's facing and turned it 90 degrees for a forward or back one,
+    // but the game turns a walking cat toward where it walks, so nearly every dodge made on the move became a
+    // sideways hop: "the cat is never facing the correct way", the player said.)
     struct DodgePose
     {
-        bool right = true;
-        double cat_yaw = 0;
+        bool jump = true;      // a plain jump (no animation), else the game's side hop
+        bool right = true;     // the side hop's side
+        double cat_yaw = 0;    // which way your cat faces for it
     };
-    inline auto dodge_pose(double cat_yaw, double yaw) -> DodgePose
+    inline auto dodge_pose(double yaw, std::optional<double> target_yaw) -> DodgePose
     {
-        const double a = turn(cat_yaw, yaw);
-        if (a >= 30 && a <= 150) return {true, cat_yaw};
-        if (a <= -30 && a >= -150) return {false, cat_yaw};
-        return {true, yaw - 90};
+        if (!target_yaw) return {true, true, yaw};
+        const double a = turn(*target_yaw, yaw);
+        if (a >= 30 && a <= 150) return {false, true, *target_yaw};
+        if (a <= -30 && a >= -150) return {false, false, *target_yaw};
+        return {true, true, *target_yaw};
     }
 
     // A dodge can cut an attack short once it's landed, not in its wind-up.

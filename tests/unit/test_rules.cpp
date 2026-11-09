@@ -253,15 +253,19 @@ static void the_dodge()
     CHECK(near(rtc::dodge_yaw(30, 50, 0, -1), -60));
     CHECK(near(rtc::dodge_yaw(0, 50, 0, 0), 230));
     CHECK(near(rtc::dodge_yaw(0, 50, 0.1, 0.1), 230));
-    // to the side: the hop that way, facing kept; forward or back: turned so the right hop goes that way
-    rtc::DodgePose right = rtc::dodge_pose(0, 90);
-    CHECK(right.right && near(right.cat_yaw, 0));
-    rtc::DodgePose left = rtc::dodge_pose(0, -100);
-    CHECK(!left.right && near(left.cat_yaw, 0));
-    rtc::DodgePose back = rtc::dodge_pose(0, 180);
-    CHECK(back.right && near(rtc::turn(back.cat_yaw + 90, 180), 0));
-    rtc::DodgePose ahead = rtc::dodge_pose(20, 25);
-    CHECK(ahead.right && near(rtc::turn(ahead.cat_yaw + 90, 25), 0));
+    // locked on (the target at yaw 0): to a side of it, the game's hop that way, your cat facing the target; toward or
+    // away from it, a plain jump facing the target
+    rtc::DodgePose right = rtc::dodge_pose(90, 0.0);
+    CHECK(!right.jump && right.right && near(right.cat_yaw, 0));
+    rtc::DodgePose left = rtc::dodge_pose(-100, 0.0);
+    CHECK(!left.jump && !left.right && near(left.cat_yaw, 0));
+    rtc::DodgePose back = rtc::dodge_pose(180, 0.0);
+    CHECK(back.jump && near(back.cat_yaw, 0));
+    rtc::DodgePose ahead = rtc::dodge_pose(25, 20.0);
+    CHECK(ahead.jump && near(ahead.cat_yaw, 20));
+    // not locked on: a jump the way it goes, your cat turned to face that way
+    rtc::DodgePose free = rtc::dodge_pose(135, std::nullopt);
+    CHECK(free.jump && near(free.cat_yaw, 135));
     // out of an attack only once it's landed
     const auto& light = rtc::spec(rtc::Attack::Light);
     CHECK(!rtc::can_dodge_out_of(light, 0.1) && rtc::can_dodge_out_of(light, rtc::hit_at(light)));
